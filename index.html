@@ -110,8 +110,8 @@
             onAuthStateChanged,
             signOut,
             signInWithEmailAndPassword,
-            setPersistence, // Importado para a correção
-            browserSessionPersistence // Importado para a correção
+            setPersistence,
+            browserSessionPersistence
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { 
             getFirestore, 
@@ -157,6 +157,7 @@
         // Autenticação
         onAuthStateChanged(auth, async (user) => {
             if (user) {
+                // Esta função ainda é importante para manter o login ao recarregar a página
                 authOverlay.classList.add('hidden');
                 adminPanel.classList.remove('hidden');
                 adminEmailSpan.textContent = user.email;
@@ -173,11 +174,16 @@
             const email = adminEmailInput.value;
             const password = adminPasswordInput.value;
             try {
-                // *** ESTA É A CORREÇÃO ***
-                // Define que o login será lembrado apenas na sessão atual do navegador,
-                // o que é mais compatível com ambientes de iframe como o Google Sites.
                 await setPersistence(auth, browserSessionPersistence);
-                await signInWithEmailAndPassword(auth, email, password);
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                
+                // *** CORREÇÃO APLICADA AQUI ***
+                // Se o login foi bem-sucedido, a linha acima não dará erro.
+                // Então, forçamos o fechamento do pop-up e a exibição do painel.
+                if (userCredential.user) {
+                    authOverlay.classList.add('hidden');
+                    adminPanel.classList.remove('hidden');
+                }
             } catch (error) {
                 console.error("Login error:", error);
                 authError.textContent = "E-mail ou senha inválidos.";
@@ -186,7 +192,7 @@
 
         logoutButton.addEventListener('click', () => signOut(auth));
 
-        // Carregamento de dados (sem alterações)
+        // Carregamento dos dados
         async function loadAllData() {
             loadingMessage.textContent = "Buscando nomes dos funcionários...";
             
@@ -199,6 +205,7 @@
                 populateUserFilter();
             } catch (e) {
                 loadingMessage.textContent = "Erro: Não foi possível carregar a lista de funcionários. Verifique as regras de segurança.";
+                console.error("Error fetching users:", e);
                 return;
             }
 
@@ -217,6 +224,7 @@
 
             } catch (e) {
                 loadingMessage.textContent = "Erro: Não foi possível carregar os registros. Verifique as regras de segurança.";
+                console.error("Error fetching time entries:", e);
             }
         }
 
@@ -230,6 +238,7 @@
             }
         }
 
+        // Renderização e Filtros
         function renderTable() {
             let totalBalanceMs = 0;
             const selectedUserId = userFilter.value;
@@ -237,9 +246,11 @@
 
             const filteredRecords = allRecords.filter(record => {
                 const isUserMatch = selectedUserId === 'all' || record.userId === selectedUserId;
+                
                 const recordDate = record.timestamp.toDate();
                 const recordDateString = `${recordDate.getFullYear()}-${(recordDate.getMonth() + 1).toString().padStart(2, '0')}-${recordDate.getDate().toString().padStart(2, '0')}`;
                 const isDateMatch = !selectedDate || recordDateString === selectedDate;
+                
                 return isUserMatch && isDateMatch;
             });
 
@@ -247,7 +258,11 @@
                 const date = record.timestamp.toDate().toLocaleDateString('pt-BR');
                 const key = `${record.userId}-${date}`;
                 if (!acc[key]) {
-                    acc[key] = { userName: usersMap[record.userId] || record.userId, date: date, entries: [] };
+                    acc[key] = {
+                        userName: usersMap[record.userId] || record.userId,
+                        date: date,
+                        entries: []
+                    };
                 }
                 acc[key].entries.push(record);
                 return acc;
@@ -273,16 +288,20 @@
             sortedKeys.forEach(key => {
                 const dayData = recordsByDayAndUser[key];
                 dayData.entries.sort((a, b) => a.timestamp.toMillis() - b.timestamp.toMillis());
+
                 const ins = dayData.entries.filter(e => e.type === 'in').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR'));
                 const outs = dayData.entries.filter(e => e.type === 'out').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR'));
+
                 let dailyWorkedMs = 0;
                 for (let i = 0; i < dayData.entries.length - 1; i += 2) {
                     if (dayData.entries[i].type === 'in' && dayData.entries[i+1].type === 'out') {
                         dailyWorkedMs += dayData.entries[i+1].timestamp.toMillis() - dayData.entries[i].timestamp.toMillis();
                     }
                 }
+                
                 let balanceText = '---';
                 let balanceClass = 'text-gray-700';
+
                 if (dayData.entries.length % 2 === 0 && dayData.entries.length > 0) {
                     const WORKDAY_MS = 6 * 60 * 60 * 1000;
                     const dailyBalanceMs = dailyWorkedMs - WORKDAY_MS;
@@ -290,9 +309,19 @@
                     balanceClass = dailyBalanceMs >= 0 ? 'text-green-600' : 'text-red-600';
                     totalBalanceMs += dailyBalanceMs;
                 }
-                const row = `<tr class="text-sm"><td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900">${dayData.userName}</td><td class="px-6 py-4 whitespace-nowrap text-gray-500">${dayData.date}</td><td class="px-6 py-4 whitespace-nowrap text-gray-500">${ins.join(', ')}</td><td class="px-6 py-4 whitespace-nowrap text-gray-500">${outs.join(', ')}</td><td class="px-6 py-4 whitespace-nowrap font-medium ${balanceClass}">${balanceText}</td></tr>`;
+
+                const row = `
+                    <tr class="text-sm">
+                        <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900">${dayData.userName}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-gray-500">${dayData.date}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-gray-500">${ins.join(', ')}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-gray-500">${outs.join(', ')}</td>
+                        <td class="px-6 py-4 whitespace-nowrap font-medium ${balanceClass}">${balanceText}</td>
+                    </tr>
+                `;
                 tableBody.innerHTML += row;
             });
+
             const totalBalanceText = formatMilliseconds(totalBalanceMs, true);
             const totalBalanceClass = totalBalanceMs >= 0 ? 'text-green-600' : 'text-red-600';
             totalBalanceEl.textContent = totalBalanceText;
@@ -304,13 +333,17 @@
             const sign = isNegative ? '-' : '';
             if (allowNegative) ms = Math.abs(ms);
             else if (isNegative) ms = 0;
+            
             const totalSeconds = Math.floor(ms / 1000);
             const hours = Math.floor(totalSeconds / 3600);
             const minutes = Math.floor((totalSeconds % 3600) / 60);
+
             return `${sign}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
         }
+
         userFilter.addEventListener('change', renderTable);
         dateFilter.addEventListener('change', renderTable);
+
     </script>
 </body>
 </html>
