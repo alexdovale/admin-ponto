@@ -10,25 +10,12 @@
         body {
             font-family: 'Inter', sans-serif;
         }
-        #auth-overlay {
-            position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background-color: rgba(0, 0, 0, 0.7);
-            z-index: 50;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            padding: 1rem;
-        }
     </style>
 </head>
 <body class="bg-gray-100">
 
-    <!-- Overlay de Autenticação -->
-    <div id="auth-overlay">
+    <!-- Seção de Autenticação -->
+    <div id="login-section" class="container mx-auto p-4 sm:p-6 lg:p-8 flex items-center justify-center" style="min-height: 80vh;">
         <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-sm">
             <h2 class="text-xl font-bold mb-4 text-center">Acesso ao Painel</h2>
             <form id="admin-login-form" class="space-y-4">
@@ -50,6 +37,7 @@
         </div>
     </div>
 
+    <!-- Painel de Dados do Administrador -->
     <div id="admin-panel" class="hidden container mx-auto p-4 sm:p-6 lg:p-8">
         <div class="flex flex-wrap justify-between items-center mb-6">
             <h1 class="text-3xl font-bold text-gray-900">Painel de Registos</h1>
@@ -62,24 +50,42 @@
         </div>
 
         <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-            <h2 class="text-lg font-medium text-gray-700">Resumo Geral</h2>
-            <div id="general-summary" class="mt-4 text-center">
-                <p class="text-sm font-medium text-gray-500">SALDO DE HORAS (FILTRO ATUAL)</p>
-                <p id="total-balance" class="text-4xl font-bold text-gray-800">--:--</p>
+            <h2 class="text-lg font-medium text-gray-700 mb-4">Resumo Geral do Período</h2>
+            <div id="general-summary" class="space-y-2">
+                <!-- Saldo por funcionário será inserido aqui -->
+                 <p class="text-gray-500 text-center">Nenhum saldo para exibir.</p>
             </div>
         </div>
 
         <div class="bg-white p-6 rounded-lg shadow-md">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                 <div>
-                    <label for="user-filter" class="block text-sm font-medium text-gray-700">Filtrar por Funcionário</label>
+                    <label for="user-filter" class="block text-sm font-medium text-gray-700">Funcionário</label>
                     <select id="user-filter" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
                         <option value="all">Todos os Funcionários</option>
                     </select>
                 </div>
                 <div>
-                    <label for="date-filter" class="block text-sm font-medium text-gray-700">Filtrar por Data</label>
-                    <input type="date" id="date-filter" class="mt-1 block w-full pl-3 pr-2 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                    <label for="month-filter" class="block text-sm font-medium text-gray-700">Mês</label>
+                    <select id="month-filter" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
+                        <option value="all">Todos os Meses</option>
+                        <option value="1">Janeiro</option>
+                        <option value="2">Fevereiro</option>
+                        <option value="3">Março</option>
+                        <option value="4">Abril</option>
+                        <option value="5">Maio</option>
+                        <option value="6">Junho</option>
+                        <option value="7">Julho</option>
+                        <option value="8">Agosto</option>
+                        <option value="9">Setembro</option>
+                        <option value="10">Outubro</option>
+                        <option value="11">Novembro</option>
+                        <option value="12">Dezembro</option>
+                    </select>
+                </div>
+                <div>
+                    <label for="year-filter" class="block text-sm font-medium text-gray-700">Ano</label>
+                    <input type="number" id="year-filter" placeholder="Ex: 2024" class="mt-1 block w-full pl-3 pr-2 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
                 </div>
             </div>
 
@@ -137,7 +143,7 @@
         const db = getFirestore(app);
         setLogLevel('Debug');
 
-        const authOverlay = document.getElementById('auth-overlay');
+        const loginSection = document.getElementById('login-section');
         const adminPanel = document.getElementById('admin-panel');
         const adminLoginForm = document.getElementById('admin-login-form');
         const adminEmailInput = document.getElementById('admin-email-input');
@@ -145,29 +151,27 @@
         const authError = document.getElementById('auth-error');
         const logoutButton = document.getElementById('logout-button');
         const adminEmailSpan = document.getElementById('admin-email');
-        const totalBalanceEl = document.getElementById('total-balance');
+        const generalSummaryEl = document.getElementById('general-summary');
         const userFilter = document.getElementById('user-filter');
-        const dateFilter = document.getElementById('date-filter');
+        const monthFilter = document.getElementById('month-filter');
+        const yearFilter = document.getElementById('year-filter');
         const tableBody = document.getElementById('records-table-body');
         const loadingMessage = document.getElementById('loading-message');
 
         let allRecords = [];
         let usersMap = {};
-        let isDataLoadedOnLogin = false;
-
+        
         // Autenticação
         onAuthStateChanged(auth, async (user) => {
             if (user) {
-                // Esta função lida com o estado de login ao recarregar a página
-                if (isDataLoadedOnLogin) return; // Previne recarregamento se já foi feito pelo login
-                authOverlay.classList.add('hidden');
+                loginSection.classList.add('hidden');
                 adminPanel.classList.remove('hidden');
                 adminEmailSpan.textContent = user.email;
+                yearFilter.value = new Date().getFullYear(); // Preenche o ano atual
                 await loadAllData();
             } else {
-                authOverlay.classList.remove('hidden');
+                loginSection.classList.remove('hidden');
                 adminPanel.classList.add('hidden');
-                isDataLoadedOnLogin = false; // Resetar no logout
             }
         });
 
@@ -178,18 +182,7 @@
             const password = adminPasswordInput.value;
             try {
                 await setPersistence(auth, browserSessionPersistence);
-                const userCredential = await signInWithEmailAndPassword(auth, email, password);
-                
-                // *** CORREÇÃO APLICADA AQUI ***
-                // Se o login foi bem-sucedido, este bloco assume o controlo total para atualizar a UI
-                // e carregar os dados imediatamente, resolvendo problemas de sincronia.
-                if (userCredential.user) {
-                    isDataLoadedOnLogin = true;
-                    authOverlay.classList.add('hidden');
-                    adminPanel.classList.remove('hidden');
-                    adminEmailSpan.textContent = userCredential.user.email;
-                    await loadAllData();
-                }
+                await signInWithEmailAndPassword(auth, email, password);
             } catch (error) {
                 console.error("Login error:", error);
                 authError.textContent = "E-mail ou senha inválidos.";
@@ -211,7 +204,6 @@
                 populateUserFilter();
             } catch (e) {
                 loadingMessage.textContent = "Erro: Não foi possível carregar a lista de funcionários. Verifique as regras de segurança.";
-                console.error("Error fetching users:", e);
                 return;
             }
 
@@ -220,17 +212,13 @@
             try {
                 const entriesQuery = query(collectionGroup(db, 'time_entries'));
                 const entriesSnapshot = await getDocs(entriesQuery);
-                
                 allRecords = [];
                 entriesSnapshot.forEach(doc => {
                     allRecords.push({ id: doc.id, ...doc.data() });
                 });
-                
                 renderTable();
-
             } catch (e) {
                 loadingMessage.textContent = "Erro: Não foi possível carregar os registos. Verifique as regras de segurança.";
-                console.error("Error fetching time entries:", e);
             }
         }
 
@@ -246,29 +234,23 @@
 
         // Renderização e Filtros
         function renderTable() {
-            let totalBalanceMs = 0;
             const selectedUserId = userFilter.value;
-            const selectedDate = dateFilter.value;
+            const selectedMonth = monthFilter.value;
+            const selectedYear = yearFilter.value;
 
             const filteredRecords = allRecords.filter(record => {
                 const isUserMatch = selectedUserId === 'all' || record.userId === selectedUserId;
-                
                 const recordDate = record.timestamp.toDate();
-                const recordDateString = `${recordDate.getFullYear()}-${(recordDate.getMonth() + 1).toString().padStart(2, '0')}-${recordDate.getDate().toString().padStart(2, '0')}`;
-                const isDateMatch = !selectedDate || recordDateString === selectedDate;
-                
-                return isUserMatch && isDateMatch;
+                const isMonthMatch = selectedMonth === 'all' || (recordDate.getMonth() + 1) == selectedMonth;
+                const isYearMatch = !selectedYear || recordDate.getFullYear() == selectedYear;
+                return isUserMatch && isMonthMatch && isYearMatch;
             });
 
             const recordsByDayAndUser = filteredRecords.reduce((acc, record) => {
                 const date = record.timestamp.toDate().toLocaleDateString('pt-BR');
                 const key = `${record.userId}-${date}`;
                 if (!acc[key]) {
-                    acc[key] = {
-                        userName: usersMap[record.userId] || record.userId,
-                        date: date,
-                        entries: []
-                    };
+                    acc[key] = { userName: usersMap[record.userId] || record.userId, date: date, entries: [] };
                 }
                 acc[key].entries.push(record);
                 return acc;
@@ -279,59 +261,64 @@
             if (Object.keys(recordsByDayAndUser).length === 0) {
                 loadingMessage.textContent = "Nenhum registo encontrado para os filtros selecionados.";
                 loadingMessage.classList.remove('hidden');
-                totalBalanceEl.textContent = '--:--';
-                totalBalanceEl.className = 'text-4xl font-bold text-gray-800';
+                generalSummaryEl.innerHTML = '<p class="text-gray-500 text-center">Nenhum saldo para exibir.</p>';
                 return;
             }
             loadingMessage.classList.add('hidden');
 
+            const userBalances = {};
+
             const sortedKeys = Object.keys(recordsByDayAndUser).sort((a, b) => {
-                const dateA = a.split('-').slice(1).join('-').split('/').reverse().join('-');
-                const dateB = b.split('-').slice(1).join('-').split('/').reverse().join('-');
-                return new Date(dateB) - new Date(dateA);
+                const dateAStr = a.split('-').slice(1).join('-').split('/').reverse().join('-');
+                const dateBStr = b.split('-').slice(1).join('-').split('/').reverse().join('-');
+                return new Date(dateBStr) - new Date(dateAStr);
             });
 
             sortedKeys.forEach(key => {
                 const dayData = recordsByDayAndUser[key];
-                dayData.entries.sort((a, b) => a.timestamp.toMillis() - b.timestamp.toMillis());
+                const userId = key.split('-')[0];
+                if (!userBalances[userId]) {
+                    userBalances[userId] = { name: usersMap[userId] || userId, balanceMs: 0 };
+                }
 
+                dayData.entries.sort((a, b) => a.timestamp.toMillis() - b.timestamp.toMillis());
                 const ins = dayData.entries.filter(e => e.type === 'in').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR'));
                 const outs = dayData.entries.filter(e => e.type === 'out').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR'));
-
                 let dailyWorkedMs = 0;
                 for (let i = 0; i < dayData.entries.length - 1; i += 2) {
                     if (dayData.entries[i].type === 'in' && dayData.entries[i+1].type === 'out') {
                         dailyWorkedMs += dayData.entries[i+1].timestamp.toMillis() - dayData.entries[i].timestamp.toMillis();
                     }
                 }
-                
                 let balanceText = '---';
                 let balanceClass = 'text-gray-700';
-
                 if (dayData.entries.length % 2 === 0 && dayData.entries.length > 0) {
                     const WORKDAY_MS = 6 * 60 * 60 * 1000;
                     const dailyBalanceMs = dailyWorkedMs - WORKDAY_MS;
                     balanceText = formatMilliseconds(dailyBalanceMs, true);
                     balanceClass = dailyBalanceMs >= 0 ? 'text-green-600' : 'text-red-600';
-                    totalBalanceMs += dailyBalanceMs;
+                    userBalances[userId].balanceMs += dailyBalanceMs;
                 }
-
-                const row = `
-                    <tr class="text-sm">
-                        <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900">${dayData.userName}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-gray-500">${dayData.date}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-gray-500">${ins.join(', ')}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-gray-500">${outs.join(', ')}</td>
-                        <td class="px-6 py-4 whitespace-nowrap font-medium ${balanceClass}">${balanceText}</td>
-                    </tr>
-                `;
+                const row = `<tr class="text-sm"><td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900">${dayData.userName}</td><td class="px-6 py-4 whitespace-nowrap text-gray-500">${dayData.date}</td><td class="px-6 py-4 whitespace-nowrap text-gray-500">${ins.join(', ')}</td><td class="px-6 py-4 whitespace-nowrap text-gray-500">${outs.join(', ')}</td><td class="px-6 py-4 whitespace-nowrap font-medium ${balanceClass}">${balanceText}</td></tr>`;
                 tableBody.innerHTML += row;
             });
 
-            const totalBalanceText = formatMilliseconds(totalBalanceMs, true);
-            const totalBalanceClass = totalBalanceMs >= 0 ? 'text-green-600' : 'text-red-600';
-            totalBalanceEl.textContent = totalBalanceText;
-            totalBalanceEl.className = `text-4xl font-bold ${totalBalanceClass}`;
+            // Renderiza o Resumo Geral
+            generalSummaryEl.innerHTML = '';
+            const sortedUserIds = Object.keys(userBalances).sort((a, b) => userBalances[a].name.localeCompare(userBalances[b].name));
+            
+            sortedUserIds.forEach(userId => {
+                const userData = userBalances[userId];
+                const totalBalanceText = formatMilliseconds(userData.balanceMs, true);
+                const totalBalanceClass = userData.balanceMs >= 0 ? 'text-green-600' : 'text-red-600';
+                const summaryItem = `
+                    <div class="flex justify-between items-center py-2 border-b border-gray-200 last:border-b-0">
+                        <span class="font-medium text-gray-800">${userData.name}</span>
+                        <span class="font-bold text-lg ${totalBalanceClass}">${totalBalanceText}</span>
+                    </div>
+                `;
+                generalSummaryEl.innerHTML += summaryItem;
+            });
         }
         
         function formatMilliseconds(ms, allowNegative = false) {
@@ -339,17 +326,15 @@
             const sign = isNegative ? '-' : '';
             if (allowNegative) ms = Math.abs(ms);
             else if (isNegative) ms = 0;
-            
             const totalSeconds = Math.floor(ms / 1000);
             const hours = Math.floor(totalSeconds / 3600);
             const minutes = Math.floor((totalSeconds % 3600) / 60);
-
-            return `${sign}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+            return `${sign}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
         }
 
         userFilter.addEventListener('change', renderTable);
-        dateFilter.addEventListener('change', renderTable);
-
+        monthFilter.addEventListener('change', renderTable);
+        yearFilter.addEventListener('change', renderTable);
     </script>
 </body>
 </html>
