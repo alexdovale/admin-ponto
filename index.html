@@ -52,7 +52,7 @@
 
     <div id="admin-panel" class="hidden container mx-auto p-4 sm:p-6 lg:p-8">
         <div class="flex flex-wrap justify-between items-center mb-6">
-            <h1 class="text-3xl font-bold text-gray-900">Painel de Registros</h1>
+            <h1 class="text-3xl font-bold text-gray-900">Painel de Registos</h1>
             <div>
                 <span id="admin-email" class="text-sm text-gray-600 mr-4"></span>
                 <button id="logout-button" class="px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-100 rounded-md hover:bg-indigo-200">
@@ -98,7 +98,7 @@
                         <!-- Os dados serão inseridos aqui -->
                     </tbody>
                 </table>
-                <p id="loading-message" class="text-center py-8 text-gray-500">Carregando registros...</p>
+                <p id="loading-message" class="text-center py-8 text-gray-500">A carregar registos...</p>
             </div>
         </div>
     </div>
@@ -153,11 +153,13 @@
 
         let allRecords = [];
         let usersMap = {};
+        let isDataLoadedOnLogin = false;
 
         // Autenticação
         onAuthStateChanged(auth, async (user) => {
             if (user) {
-                // Esta função ainda é importante para manter o login ao recarregar a página
+                // Esta função lida com o estado de login ao recarregar a página
+                if (isDataLoadedOnLogin) return; // Previne recarregamento se já foi feito pelo login
                 authOverlay.classList.add('hidden');
                 adminPanel.classList.remove('hidden');
                 adminEmailSpan.textContent = user.email;
@@ -165,6 +167,7 @@
             } else {
                 authOverlay.classList.remove('hidden');
                 adminPanel.classList.add('hidden');
+                isDataLoadedOnLogin = false; // Resetar no logout
             }
         });
 
@@ -178,11 +181,14 @@
                 const userCredential = await signInWithEmailAndPassword(auth, email, password);
                 
                 // *** CORREÇÃO APLICADA AQUI ***
-                // Se o login foi bem-sucedido, a linha acima não dará erro.
-                // Então, forçamos o fechamento do pop-up e a exibição do painel.
+                // Se o login foi bem-sucedido, este bloco assume o controlo total para atualizar a UI
+                // e carregar os dados imediatamente, resolvendo problemas de sincronia.
                 if (userCredential.user) {
+                    isDataLoadedOnLogin = true;
                     authOverlay.classList.add('hidden');
                     adminPanel.classList.remove('hidden');
+                    adminEmailSpan.textContent = userCredential.user.email;
+                    await loadAllData();
                 }
             } catch (error) {
                 console.error("Login error:", error);
@@ -194,7 +200,7 @@
 
         // Carregamento dos dados
         async function loadAllData() {
-            loadingMessage.textContent = "Buscando nomes dos funcionários...";
+            loadingMessage.textContent = "A buscar nomes dos funcionários...";
             
             try {
                 const usersSnapshot = await getDocs(collection(db, "users"));
@@ -209,7 +215,7 @@
                 return;
             }
 
-            loadingMessage.textContent = "Buscando todos os registros de ponto...";
+            loadingMessage.textContent = "A buscar todos os registos de ponto...";
             
             try {
                 const entriesQuery = query(collectionGroup(db, 'time_entries'));
@@ -223,7 +229,7 @@
                 renderTable();
 
             } catch (e) {
-                loadingMessage.textContent = "Erro: Não foi possível carregar os registros. Verifique as regras de segurança.";
+                loadingMessage.textContent = "Erro: Não foi possível carregar os registos. Verifique as regras de segurança.";
                 console.error("Error fetching time entries:", e);
             }
         }
@@ -271,7 +277,7 @@
             tableBody.innerHTML = '';
             
             if (Object.keys(recordsByDayAndUser).length === 0) {
-                loadingMessage.textContent = "Nenhum registro encontrado para os filtros selecionados.";
+                loadingMessage.textContent = "Nenhum registo encontrado para os filtros selecionados.";
                 loadingMessage.classList.remove('hidden');
                 totalBalanceEl.textContent = '--:--';
                 totalBalanceEl.className = 'text-4xl font-bold text-gray-800';
