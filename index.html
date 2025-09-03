@@ -52,7 +52,7 @@
         <div class="bg-white p-6 rounded-lg shadow-md mb-6">
             <h2 class="text-lg font-medium text-gray-700 mb-4">Resumo Geral do Período</h2>
             <div id="general-summary" class="space-y-2">
-                <!-- Saldo por funcionário será inserido aqui -->
+                <!-- Saldo por funcionário e por mês será inserido aqui -->
                  <p class="text-gray-500 text-center">Nenhum saldo para exibir.</p>
             </div>
         </div>
@@ -266,7 +266,7 @@
             }
             loadingMessage.classList.add('hidden');
 
-            const userBalances = {};
+            const monthlyUserBalances = {};
 
             const sortedKeys = Object.keys(recordsByDayAndUser).sort((a, b) => {
                 const dateAStr = a.split('-').slice(1).join('-').split('/').reverse().join('-');
@@ -277,10 +277,7 @@
             sortedKeys.forEach(key => {
                 const dayData = recordsByDayAndUser[key];
                 const userId = key.split('-')[0];
-                if (!userBalances[userId]) {
-                    userBalances[userId] = { name: usersMap[userId] || userId, balanceMs: 0 };
-                }
-
+                
                 dayData.entries.sort((a, b) => a.timestamp.toMillis() - b.timestamp.toMillis());
                 const ins = dayData.entries.filter(e => e.type === 'in').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR'));
                 const outs = dayData.entries.filter(e => e.type === 'out').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR'));
@@ -297,27 +294,54 @@
                     const dailyBalanceMs = dailyWorkedMs - WORKDAY_MS;
                     balanceText = formatMilliseconds(dailyBalanceMs, true);
                     balanceClass = dailyBalanceMs >= 0 ? 'text-green-600' : 'text-red-600';
-                    userBalances[userId].balanceMs += dailyBalanceMs;
+                    
+                    // Agrupa saldos por mês
+                    const recordDate = dayData.entries[0].timestamp.toDate();
+                    const monthKey = `${recordDate.getMonth() + 1}/${recordDate.getFullYear()}`;
+                    if (!monthlyUserBalances[monthKey]) monthlyUserBalances[monthKey] = {};
+                    if (!monthlyUserBalances[monthKey][userId]) {
+                         monthlyUserBalances[monthKey][userId] = { name: usersMap[userId] || userId, balanceMs: 0 };
+                    }
+                    monthlyUserBalances[monthKey][userId].balanceMs += dailyBalanceMs;
                 }
                 const row = `<tr class="text-sm"><td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900">${dayData.userName}</td><td class="px-6 py-4 whitespace-nowrap text-gray-500">${dayData.date}</td><td class="px-6 py-4 whitespace-nowrap text-gray-500">${ins.join(', ')}</td><td class="px-6 py-4 whitespace-nowrap text-gray-500">${outs.join(', ')}</td><td class="px-6 py-4 whitespace-nowrap font-medium ${balanceClass}">${balanceText}</td></tr>`;
                 tableBody.innerHTML += row;
             });
 
-            // Renderiza o Resumo Geral
+            // Renderiza o Resumo Geral por Mês
             generalSummaryEl.innerHTML = '';
-            const sortedUserIds = Object.keys(userBalances).sort((a, b) => userBalances[a].name.localeCompare(userBalances[b].name));
+            const sortedMonthKeys = Object.keys(monthlyUserBalances).sort((a, b) => {
+                const [monthA, yearA] = a.split('/');
+                const [monthB, yearB] = b.split('/');
+                return new Date(yearB, monthB - 1) - new Date(yearA, monthA - 1);
+            });
+
+            if(sortedMonthKeys.length === 0){
+                 generalSummaryEl.innerHTML = '<p class="text-gray-500 text-center">Nenhum saldo para exibir.</p>';
+                 return;
+            }
             
-            sortedUserIds.forEach(userId => {
-                const userData = userBalances[userId];
-                const totalBalanceText = formatMilliseconds(userData.balanceMs, true);
-                const totalBalanceClass = userData.balanceMs >= 0 ? 'text-green-600' : 'text-red-600';
-                const summaryItem = `
-                    <div class="flex justify-between items-center py-2 border-b border-gray-200 last:border-b-0">
-                        <span class="font-medium text-gray-800">${userData.name}</span>
-                        <span class="font-bold text-lg ${totalBalanceClass}">${totalBalanceText}</span>
-                    </div>
-                `;
-                generalSummaryEl.innerHTML += summaryItem;
+            sortedMonthKeys.forEach(monthKey => {
+                const [month, year] = monthKey.split('/');
+                const monthName = new Date(year, month - 1, 1).toLocaleString('pt-BR', { month: 'long' });
+                const monthTitle = `<h3 class="text-md font-semibold text-gray-600 mt-4 first:mt-0">${monthName.charAt(0).toUpperCase() + monthName.slice(1)} de ${year}</h3>`;
+                generalSummaryEl.innerHTML += monthTitle;
+
+                const userBalances = monthlyUserBalances[monthKey];
+                const sortedUserIds = Object.keys(userBalances).sort((a, b) => userBalances[a].name.localeCompare(userBalances[b].name));
+            
+                sortedUserIds.forEach(userId => {
+                    const userData = userBalances[userId];
+                    const totalBalanceText = formatMilliseconds(userData.balanceMs, true);
+                    const totalBalanceClass = userData.balanceMs >= 0 ? 'text-green-600' : 'text-red-600';
+                    const summaryItem = `
+                        <div class="flex justify-between items-center py-2 border-b border-gray-200 last:border-b-0">
+                            <span class="font-medium text-gray-800">${userData.name}</span>
+                            <span class="font-bold text-lg ${totalBalanceClass}">${totalBalanceText}</span>
+                        </div>
+                    `;
+                    generalSummaryEl.innerHTML += summaryItem;
+                });
             });
         }
         
