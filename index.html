@@ -61,7 +61,6 @@
             </div>
         </div>
 
-        <!-- NOVO PAINEL DE RESUMO GERAL -->
         <div class="bg-white p-6 rounded-lg shadow-md mb-6">
             <h2 class="text-lg font-medium text-gray-700">Resumo Geral</h2>
             <div id="general-summary" class="mt-4 text-center">
@@ -111,8 +110,8 @@
             onAuthStateChanged,
             signOut,
             signInWithEmailAndPassword,
-            setPersistence,
-            browserSessionPersistence
+            setPersistence, // Importado para a correção
+            browserSessionPersistence // Importado para a correção
         } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { 
             getFirestore, 
@@ -146,12 +145,11 @@
         const authError = document.getElementById('auth-error');
         const logoutButton = document.getElementById('logout-button');
         const adminEmailSpan = document.getElementById('admin-email');
-
+        const totalBalanceEl = document.getElementById('total-balance');
         const userFilter = document.getElementById('user-filter');
         const dateFilter = document.getElementById('date-filter');
         const tableBody = document.getElementById('records-table-body');
         const loadingMessage = document.getElementById('loading-message');
-        const totalBalanceEl = document.getElementById('total-balance');
 
         let allRecords = [];
         let usersMap = {};
@@ -175,6 +173,9 @@
             const email = adminEmailInput.value;
             const password = adminPasswordInput.value;
             try {
+                // *** ESTA É A CORREÇÃO ***
+                // Define que o login será lembrado apenas na sessão atual do navegador,
+                // o que é mais compatível com ambientes de iframe como o Google Sites.
                 await setPersistence(auth, browserSessionPersistence);
                 await signInWithEmailAndPassword(auth, email, password);
             } catch (error) {
@@ -185,7 +186,7 @@
 
         logoutButton.addEventListener('click', () => signOut(auth));
 
-        // Carregamento dos dados
+        // Carregamento de dados (sem alterações)
         async function loadAllData() {
             loadingMessage.textContent = "Buscando nomes dos funcionários...";
             
@@ -198,7 +199,6 @@
                 populateUserFilter();
             } catch (e) {
                 loadingMessage.textContent = "Erro: Não foi possível carregar a lista de funcionários. Verifique as regras de segurança.";
-                console.error("Error fetching users:", e);
                 return;
             }
 
@@ -217,7 +217,6 @@
 
             } catch (e) {
                 loadingMessage.textContent = "Erro: Não foi possível carregar os registros. Verifique as regras de segurança.";
-                console.error("Error fetching time entries:", e);
             }
         }
 
@@ -231,7 +230,6 @@
             }
         }
 
-        // Renderização e Filtros
         function renderTable() {
             let totalBalanceMs = 0;
             const selectedUserId = userFilter.value;
@@ -239,11 +237,9 @@
 
             const filteredRecords = allRecords.filter(record => {
                 const isUserMatch = selectedUserId === 'all' || record.userId === selectedUserId;
-                
                 const recordDate = record.timestamp.toDate();
                 const recordDateString = `${recordDate.getFullYear()}-${(recordDate.getMonth() + 1).toString().padStart(2, '0')}-${recordDate.getDate().toString().padStart(2, '0')}`;
                 const isDateMatch = !selectedDate || recordDateString === selectedDate;
-                
                 return isUserMatch && isDateMatch;
             });
 
@@ -251,11 +247,7 @@
                 const date = record.timestamp.toDate().toLocaleDateString('pt-BR');
                 const key = `${record.userId}-${date}`;
                 if (!acc[key]) {
-                    acc[key] = {
-                        userName: usersMap[record.userId] || record.userId,
-                        date: date,
-                        entries: []
-                    };
+                    acc[key] = { userName: usersMap[record.userId] || record.userId, date: date, entries: [] };
                 }
                 acc[key].entries.push(record);
                 return acc;
@@ -281,41 +273,26 @@
             sortedKeys.forEach(key => {
                 const dayData = recordsByDayAndUser[key];
                 dayData.entries.sort((a, b) => a.timestamp.toMillis() - b.timestamp.toMillis());
-
                 const ins = dayData.entries.filter(e => e.type === 'in').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR'));
                 const outs = dayData.entries.filter(e => e.type === 'out').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR'));
-
                 let dailyWorkedMs = 0;
                 for (let i = 0; i < dayData.entries.length - 1; i += 2) {
                     if (dayData.entries[i].type === 'in' && dayData.entries[i+1].type === 'out') {
                         dailyWorkedMs += dayData.entries[i+1].timestamp.toMillis() - dayData.entries[i].timestamp.toMillis();
                     }
                 }
-                
                 let balanceText = '---';
                 let balanceClass = 'text-gray-700';
-
                 if (dayData.entries.length % 2 === 0 && dayData.entries.length > 0) {
                     const WORKDAY_MS = 6 * 60 * 60 * 1000;
                     const dailyBalanceMs = dailyWorkedMs - WORKDAY_MS;
                     balanceText = formatMilliseconds(dailyBalanceMs, true);
                     balanceClass = dailyBalanceMs >= 0 ? 'text-green-600' : 'text-red-600';
-                    totalBalanceMs += dailyBalanceMs; // Soma ao total geral
+                    totalBalanceMs += dailyBalanceMs;
                 }
-
-                const row = `
-                    <tr class="text-sm">
-                        <td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900">${dayData.userName}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-gray-500">${dayData.date}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-gray-500">${ins.join(', ')}</td>
-                        <td class="px-6 py-4 whitespace-nowrap text-gray-500">${outs.join(', ')}</td>
-                        <td class="px-6 py-4 whitespace-nowrap font-medium ${balanceClass}">${balanceText}</td>
-                    </tr>
-                `;
+                const row = `<tr class="text-sm"><td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900">${dayData.userName}</td><td class="px-6 py-4 whitespace-nowrap text-gray-500">${dayData.date}</td><td class="px-6 py-4 whitespace-nowrap text-gray-500">${ins.join(', ')}</td><td class="px-6 py-4 whitespace-nowrap text-gray-500">${outs.join(', ')}</td><td class="px-6 py-4 whitespace-nowrap font-medium ${balanceClass}">${balanceText}</td></tr>`;
                 tableBody.innerHTML += row;
             });
-
-            // Atualiza o painel de resumo geral
             const totalBalanceText = formatMilliseconds(totalBalanceMs, true);
             const totalBalanceClass = totalBalanceMs >= 0 ? 'text-green-600' : 'text-red-600';
             totalBalanceEl.textContent = totalBalanceText;
@@ -327,17 +304,13 @@
             const sign = isNegative ? '-' : '';
             if (allowNegative) ms = Math.abs(ms);
             else if (isNegative) ms = 0;
-            
             const totalSeconds = Math.floor(ms / 1000);
             const hours = Math.floor(totalSeconds / 3600);
             const minutes = Math.floor((totalSeconds % 3600) / 60);
-
             return `${sign}${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
         }
-
         userFilter.addEventListener('change', renderTable);
         dateFilter.addEventListener('change', renderTable);
-
     </script>
 </body>
 </html>
