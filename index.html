@@ -10,12 +10,25 @@
         body {
             font-family: 'Inter', sans-serif;
         }
+        #auth-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            z-index: 50;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1rem;
+        }
     </style>
 </head>
 <body class="bg-gray-100">
 
-    <!-- Seção de Autenticação -->
-    <div id="login-section" class="container mx-auto p-4 sm:p-6 lg:p-8 flex items-center justify-center" style="min-height: 80vh;">
+    <!-- Overlay de Autenticação -->
+    <div id="auth-overlay">
         <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-sm">
             <h2 class="text-xl font-bold mb-4 text-center">Acesso ao Painel</h2>
             <form id="admin-login-form" class="space-y-4">
@@ -37,7 +50,6 @@
         </div>
     </div>
 
-    <!-- Painel de Dados do Administrador -->
     <div id="admin-panel" class="hidden container mx-auto p-4 sm:p-6 lg:p-8">
         <div class="flex flex-wrap justify-between items-center mb-6">
             <h1 class="text-3xl font-bold text-gray-900">Painel de Registos</h1>
@@ -125,7 +137,7 @@
         const db = getFirestore(app);
         setLogLevel('Debug');
 
-        const loginSection = document.getElementById('login-section');
+        const authOverlay = document.getElementById('auth-overlay');
         const adminPanel = document.getElementById('admin-panel');
         const adminLoginForm = document.getElementById('admin-login-form');
         const adminEmailInput = document.getElementById('admin-email-input');
@@ -141,19 +153,21 @@
 
         let allRecords = [];
         let usersMap = {};
-        
+        let isDataLoadedOnLogin = false;
+
         // Autenticação
         onAuthStateChanged(auth, async (user) => {
             if (user) {
-                // Usuário está logado
-                loginSection.classList.add('hidden');
+                // Esta função lida com o estado de login ao recarregar a página
+                if (isDataLoadedOnLogin) return; // Previne recarregamento se já foi feito pelo login
+                authOverlay.classList.add('hidden');
                 adminPanel.classList.remove('hidden');
                 adminEmailSpan.textContent = user.email;
                 await loadAllData();
             } else {
-                // Usuário está deslogado
-                loginSection.classList.remove('hidden');
+                authOverlay.classList.remove('hidden');
                 adminPanel.classList.add('hidden');
+                isDataLoadedOnLogin = false; // Resetar no logout
             }
         });
 
@@ -164,8 +178,18 @@
             const password = adminPasswordInput.value;
             try {
                 await setPersistence(auth, browserSessionPersistence);
-                await signInWithEmailAndPassword(auth, email, password);
-                // O onAuthStateChanged vai lidar com a mudança da interface
+                const userCredential = await signInWithEmailAndPassword(auth, email, password);
+                
+                // *** CORREÇÃO APLICADA AQUI ***
+                // Se o login foi bem-sucedido, este bloco assume o controlo total para atualizar a UI
+                // e carregar os dados imediatamente, resolvendo problemas de sincronia.
+                if (userCredential.user) {
+                    isDataLoadedOnLogin = true;
+                    authOverlay.classList.add('hidden');
+                    adminPanel.classList.remove('hidden');
+                    adminEmailSpan.textContent = userCredential.user.email;
+                    await loadAllData();
+                }
             } catch (error) {
                 console.error("Login error:", error);
                 authError.textContent = "E-mail ou senha inválidos.";
