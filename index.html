@@ -66,7 +66,7 @@
                         <select id="user-dropdown" class="w-full p-2 border rounded-md mb-4"></select>
                         <div class="flex flex-wrap gap-4">
                             <input type="month" id="month-selector" class="p-2 border rounded-md">
-                            <button id="generate-report-btn" class="py-2 px-4 rounded-md text-white bg-green-600 hover:bg-green-700">Gerar Relatório</button>
+                            <button id="download-report-btn" class="py-2 px-4 rounded-md text-white bg-green-600 hover:bg-green-700">Baixar Relatório</button>
                         </div>
                     </div>
                     
@@ -77,9 +77,9 @@
                                 <thead class="bg-gray-50">
                                     <tr>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Entrada</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saída</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saldo do Dia</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Horário</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
                                     </tr>
                                 </thead>
                                 <tbody id="report-table-body" class="bg-white divide-y divide-gray-200"></tbody>
@@ -125,11 +125,22 @@
     <div id="forgot-password-modal" class="modal">
         <div class="modal-content"><span id="close-forgot-modal-button" class="float-right text-2xl font-bold cursor-pointer">&times;</span><h3 class="text-lg font-medium mb-4">Redefinir Senha</h3><p class="text-sm text-gray-600 mb-4">Digite seu e-mail para receber um link de redefinição.</p><form id="forgot-password-form"><input id="forgot-email" type="email" required placeholder="Seu e-mail" class="w-full px-3 py-2 border rounded-md"><button type="submit" class="mt-4 w-full py-2 px-4 rounded-md text-white bg-green-600 hover:bg-green-700">Enviar Link</button></form><p id="modal-message" class="text-sm mt-4 text-center"></p></div>
     </div>
+    <div id="delete-confirm-modal" class="modal">
+        <div class="modal-content">
+            <h3 class="text-lg font-medium mb-4">Confirmar Exclusão</h3>
+            <p class="text-sm text-gray-600 mb-4">Tem certeza que deseja apagar este registro de ponto? Esta ação não pode ser desfeita.</p>
+            <div class="flex justify-end gap-4">
+                <button id="cancel-delete-btn" class="py-2 px-4 rounded-md text-gray-700 bg-gray-200 hover:bg-gray-300">Cancelar</button>
+                <button id="confirm-delete-btn" class="py-2 px-4 rounded-md text-white bg-red-600 hover:bg-red-700">Apagar</button>
+            </div>
+        </div>
+    </div>
+
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, doc, getDoc, Timestamp, updateDoc, query, orderBy, getDocs, where } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, doc, getDoc, Timestamp, updateDoc, query, orderBy, getDocs, where, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         // ----- INFORMAÇÕES DE CONFIGURAÇÃO (SUA CONFIGURAÇÃO) -----
         const appId = "1:582643132528:web:2d489ae3c23786152a2cb5";
@@ -163,14 +174,18 @@
             reportTableBody: document.getElementById('report-table-body'),
             noReportMessage: document.getElementById('no-report-message'),
             monthSelector: document.getElementById('month-selector'),
-            generateReportBtn: document.getElementById('generate-report-btn'),
+            downloadReportBtn: document.getElementById('download-report-btn'),
             monthlyBalance: document.getElementById('monthly-balance'),
             reportTitle: document.getElementById('report-title'),
+            deleteConfirmModal: document.getElementById('delete-confirm-modal'),
+            cancelDeleteBtn: document.getElementById('cancel-delete-btn'),
+            confirmDeleteBtn: document.getElementById('confirm-delete-btn'),
             forgot: { modal: document.getElementById('forgot-password-modal'), link: document.getElementById('forgot-password-link'), close: document.getElementById('close-forgot-modal-button'), form: document.getElementById('forgot-password-form'), email: document.getElementById('forgot-email'), msg: document.getElementById('modal-message') },
         };
 
         let unsubscribe = { users: null, requests: null, entries: null };
         let allUsers = [];
+        let recordToDelete = null;
 
         onAuthStateChanged(auth, async (user) => {
             if (user) {
@@ -237,26 +252,26 @@
             });
         }
         
-        ui.generateReportBtn.addEventListener('click', () => {
+        ui.downloadReportBtn.addEventListener('click', () => {
             const selectedUserId = ui.userDropdown.value;
             const selectedDate = ui.monthSelector.value;
             if (selectedUserId && selectedDate) {
                 const [year, month] = selectedDate.split('-');
-                generateMonthlyReport(selectedUserId, parseInt(month), parseInt(year));
+                downloadMonthlyReport(selectedUserId, parseInt(month), parseInt(year));
             } else {
                 ui.reportTableBody.innerHTML = '';
                 ui.monthlyBalance.classList.add('hidden');
                 ui.reportTitle.textContent = 'Histórico de Registros';
                 ui.noReportMessage.classList.remove('hidden');
-                ui.noReportMessage.textContent = "Por favor, selecione um funcionário e um mês para gerar o relatório.";
+                ui.noReportMessage.textContent = "Por favor, selecione um funcionário e um mês para baixar o relatório.";
             }
         });
 
-        async function generateMonthlyReport(userId, month, year) {
-            ui.reportTitle.textContent = `Carregando dados...`;
-            ui.reportTableBody.innerHTML = '';
-            ui.monthlyBalance.classList.add('hidden');
+        async function downloadMonthlyReport(userId, month, year) {
             ui.noReportMessage.classList.add('hidden');
+            ui.monthlyBalance.classList.add('hidden');
+            ui.reportTableBody.innerHTML = '';
+            ui.reportTitle.textContent = `Carregando dados...`;
 
             const entriesRef = collection(db, 'artifacts', appId, 'users', userId, 'time_entries');
             const entriesQuery = query(entriesRef, orderBy("timestamp", "asc"));
@@ -276,27 +291,20 @@
                 return;
             }
 
-            renderReportTable(filteredEntries, userId);
-        }
-
-        function renderReportTable(entries, userId) {
-            ui.reportTableBody.innerHTML = '';
-            ui.noReportMessage.classList.add('hidden');
-            ui.reportTitle.textContent = `Relatório para ${allUsers.find(u => u.id === userId)?.name}`;
-            
-            const entriesByDay = entries.reduce((acc, entry) => {
+            // Geração e Download do CSV
+            let csvContent = "Data,Horário,Tipo\n";
+            let totalMonthlyBalanceMs = 0;
+            const entriesByDay = filteredEntries.reduce((acc, entry) => {
                 const date = entry.timestamp.toDate().toLocaleDateString('pt-BR');
                 if (!acc[date]) acc[date] = [];
                 acc[date].push(entry);
                 return acc;
             }, {});
 
-            let totalMonthlyBalanceMs = 0;
-
             Object.keys(entriesByDay).forEach(date => {
                 const dayEntries = entriesByDay[date];
-                const ins = dayEntries.filter(e => e.type === 'in').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR')).join(', ');
-                const outs = dayEntries.filter(e => e.type === 'out').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR')).join(', ');
+                const ins = dayEntries.filter(e => e.type === 'in').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR')).join('; ');
+                const outs = dayEntries.filter(e => e.type === 'out').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR')).join('; ');
                 
                 let dailyWorkedMs = 0;
                 const sortedEntries = dayEntries.sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
@@ -306,25 +314,119 @@
                     }
                 }
 
-                let dailyBalanceText = '---', dailyBalanceClass = 'text-gray-700';
+                let dailyBalanceText = '---';
                 if (dayEntries.length % 2 === 0 && dayEntries.length > 0) {
                     const dailyBalanceMs = dailyWorkedMs - (6 * 3600 * 1000);
                     if (Math.abs(dailyBalanceMs) > (15 * 60 * 1000)) {
                         totalMonthlyBalanceMs += dailyBalanceMs;
                     }
                     dailyBalanceText = Math.abs(dailyBalanceMs) <= (15 * 60 * 1000) ? '00:00:00' : formatMilliseconds(dailyBalanceMs, true);
-                    dailyBalanceClass = dailyBalanceMs > 0 ? 'text-green-600' : 'text-red-600';
                 }
-
-                const row = document.createElement('tr');
-                row.innerHTML = `<td class="px-6 py-4">${date}</td><td class="px-6 py-4">${ins}</td><td class="px-6 py-4">${outs}</td><td class="px-6 py-4 font-medium ${dailyBalanceClass}">${dailyBalanceText}</td>`;
-                ui.reportTableBody.appendChild(row);
+                csvContent += `${date},"${ins}","${outs}","${dailyBalanceText}"\n`;
             });
 
-            ui.monthlyBalance.textContent = `Saldo total do mês: ${formatMilliseconds(totalMonthlyBalanceMs, true)}`;
-            ui.monthlyBalance.className = `mt-4 p-4 rounded-md font-bold text-center ${totalMonthlyBalanceMs >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
-            ui.monthlyBalance.classList.remove('hidden');
+            const userName = allUsers.find(u => u.id === userId)?.name || 'Funcionario';
+            const monthName = new Date(year, month - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+            csvContent += `\nSaldo total do mês:,,"",${formatMilliseconds(totalMonthlyBalanceMs, true)}\n`;
+            
+            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement("a");
+            const url = URL.createObjectURL(blob);
+            link.setAttribute("href", url);
+            link.setAttribute("download", `relatorio_ponto_${userName.toLowerCase().replace(/\s/g, '_')}_${month}_${year}.csv`);
+            link.style.visibility = 'hidden';
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            ui.reportTitle.textContent = `Relatório de ${userName} para ${monthName} baixado com sucesso!`;
         }
+        
+        ui.userDropdown.addEventListener('change', async (e) => {
+            const selectedUserId = e.target.value;
+            if (selectedUserId) {
+                // Apenas renderiza a tabela para o funcionário selecionado, sem filtro de mês
+                ui.reportTitle.textContent = `Carregando dados...`;
+                ui.noReportMessage.classList.add('hidden');
+                ui.monthlyBalance.classList.add('hidden');
+                
+                const entriesRef = collection(db, 'artifacts', appId, 'users', selectedUserId, 'time_entries');
+                const entriesQuery = query(entriesRef, orderBy("timestamp", "asc"));
+                
+                if (unsubscribe.entries) unsubscribe.entries();
+                unsubscribe.entries = onSnapshot(entriesQuery, (snapshot) => {
+                    const allEntries = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+                    renderFullReportTable(allEntries, selectedUserId);
+                });
+            } else {
+                ui.reportTableBody.innerHTML = '';
+                ui.monthlyBalance.classList.add('hidden');
+                ui.reportTitle.textContent = '';
+                ui.noReportMessage.classList.remove('hidden');
+                ui.noReportMessage.textContent = "Selecione um funcionário e um mês para gerar o relatório.";
+            }
+        });
+        
+        function renderFullReportTable(entries, userId) {
+            ui.reportTableBody.innerHTML = '';
+            ui.noReportMessage.classList.add('hidden');
+            ui.reportTitle.textContent = `Histórico Completo para ${allUsers.find(u => u.id === userId)?.name}`;
+
+            if (entries.length === 0) {
+                 ui.noReportMessage.classList.remove('hidden');
+                 ui.noReportMessage.textContent = 'Nenhum registro encontrado para este funcionário.';
+                 return;
+            }
+            
+            entries.forEach(entry => {
+                const row = document.createElement('tr');
+                const entryDate = entry.timestamp.toDate();
+                const formattedDate = entryDate.toLocaleDateString('pt-BR');
+                const formattedTime = entryDate.toLocaleTimeString('pt-BR');
+                const entryType = entry.type === 'in' ? 'Entrada' : 'Saída';
+                
+                row.innerHTML = `
+                    <td class="px-6 py-4 whitespace-nowrap">${formattedDate}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">${formattedTime}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">${entryType}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <button class="delete-btn text-red-600 hover:text-red-900" data-record-id="${entry.id}" data-user-id="${userId}">
+                            Apagar
+                        </button>
+                    </td>
+                `;
+                ui.reportTableBody.appendChild(row);
+            });
+            
+            document.querySelectorAll('.delete-btn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    recordToDelete = {
+                        userId: e.target.dataset.userId,
+                        recordId: e.target.dataset.recordId
+                    };
+                    ui.deleteConfirmModal.style.display = 'flex';
+                });
+            });
+        }
+        
+        ui.confirmDeleteBtn.addEventListener('click', async () => {
+            if (recordToDelete) {
+                const { userId, recordId } = recordToDelete;
+                try {
+                    await deleteDoc(doc(db, `artifacts/${appId}/users/${userId}/time_entries`, recordId));
+                } catch (error) {
+                    console.error("Erro ao apagar registro:", error);
+                } finally {
+                    recordToDelete = null;
+                    ui.deleteConfirmModal.style.display = 'none';
+                }
+            }
+        });
+
+        ui.cancelDeleteBtn.addEventListener('click', () => {
+            recordToDelete = null;
+            ui.deleteConfirmModal.style.display = 'none';
+        });
+
 
         function renderRequestsTable(requests, users, role, team) {
             ui.requestTableBody.innerHTML = '';
