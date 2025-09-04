@@ -23,6 +23,8 @@
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
+        .editable { cursor: pointer; }
+        .editable:hover { background-color: #f3f4f6; }
     </style>
 </head>
 <body class="bg-gray-100">
@@ -71,7 +73,7 @@
                     </div>
                     
                     <div id="reports-container">
-                        <h3 id="report-title" class="text-lg font-medium"></h3>
+                        <h3 id="report-title" class="text-lg font-medium">Histórico de Registros</h3>
                         <div class="mt-4 overflow-x-auto">
                             <table class="min-w-full divide-y divide-gray-200">
                                 <thead class="bg-gray-50">
@@ -135,6 +137,19 @@
             </div>
         </div>
     </div>
+    <div id="edit-modal" class="modal">
+        <div class="modal-content">
+            <h3 class="text-lg font-medium mb-4">Editar Registro de Ponto</h3>
+            <div class="mb-4">
+                <label for="edit-time-input" class="block text-sm font-medium text-gray-700 mb-1">Horário:</label>
+                <input type="time" id="edit-time-input" class="w-full px-3 py-2 border rounded-md">
+            </div>
+            <div class="flex justify-end gap-4">
+                <button id="cancel-edit-btn" class="py-2 px-4 rounded-md text-gray-700 bg-gray-200 hover:bg-gray-300">Cancelar</button>
+                <button id="save-edit-btn" class="py-2 px-4 rounded-md text-white bg-green-600 hover:bg-green-700">Salvar</button>
+            </div>
+        </div>
+    </div>
 
 
     <script type="module">
@@ -180,11 +195,16 @@
             deleteConfirmModal: document.getElementById('delete-confirm-modal'),
             cancelDeleteBtn: document.getElementById('cancel-delete-btn'),
             confirmDeleteBtn: document.getElementById('confirm-delete-btn'),
+            editModal: document.getElementById('edit-modal'),
+            editTimeInput: document.getElementById('edit-time-input'),
+            cancelEditBtn: document.getElementById('cancel-edit-btn'),
+            saveEditBtn: document.getElementById('save-edit-btn'),
             forgot: { modal: document.getElementById('forgot-password-modal'), link: document.getElementById('forgot-password-link'), close: document.getElementById('close-forgot-modal-button'), form: document.getElementById('forgot-password-form'), email: document.getElementById('forgot-email'), msg: document.getElementById('modal-message') },
         };
 
         let unsubscribe = { users: null, requests: null, entries: null };
         let allUsers = [];
+        let recordToEdit = null;
         let recordToDelete = null;
 
         onAuthStateChanged(auth, async (user) => {
@@ -251,106 +271,16 @@
                 }
             });
         }
-        
-        ui.downloadReportBtn.addEventListener('click', () => {
-            const selectedUserId = ui.userDropdown.value;
-            const selectedDate = ui.monthSelector.value;
-            if (selectedUserId && selectedDate) {
-                const [year, month] = selectedDate.split('-');
-                downloadMonthlyReport(selectedUserId, parseInt(month), parseInt(year));
-            } else {
-                ui.reportTableBody.innerHTML = '';
-                ui.monthlyBalance.classList.add('hidden');
-                ui.reportTitle.textContent = 'Histórico de Registros';
-                ui.noReportMessage.classList.remove('hidden');
-                ui.noReportMessage.textContent = "Por favor, selecione um funcionário e um mês para baixar o relatório.";
-            }
-        });
 
-        async function downloadMonthlyReport(userId, month, year) {
-            ui.noReportMessage.classList.add('hidden');
-            ui.monthlyBalance.classList.add('hidden');
-            ui.reportTableBody.innerHTML = '';
-            ui.reportTitle.textContent = `Carregando dados...`;
-
-            const entriesRef = collection(db, 'artifacts', appId, 'users', userId, 'time_entries');
-            const entriesQuery = query(entriesRef, orderBy("timestamp", "asc"));
-            
-            const entriesSnapshot = await getDocs(entriesQuery);
-            const allEntries = entriesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-
-            const filteredEntries = allEntries.filter(entry => {
-                const entryDate = entry.timestamp.toDate();
-                return entryDate.getFullYear() === year && (entryDate.getMonth() + 1) === month;
-            });
-
-            if (filteredEntries.length === 0) {
-                ui.reportTitle.textContent = `Relatório para ${allUsers.find(u => u.id === userId)?.name}`;
-                ui.noReportMessage.classList.remove('hidden');
-                ui.noReportMessage.textContent = "Nenhum registro encontrado para o mês selecionado.";
-                return;
-            }
-
-            // Geração e Download do CSV
-            let csvContent = "Data,Horário,Tipo\n";
-            let totalMonthlyBalanceMs = 0;
-            const entriesByDay = filteredEntries.reduce((acc, entry) => {
-                const date = entry.timestamp.toDate().toLocaleDateString('pt-BR');
-                if (!acc[date]) acc[date] = [];
-                acc[date].push(entry);
-                return acc;
-            }, {});
-
-            Object.keys(entriesByDay).forEach(date => {
-                const dayEntries = entriesByDay[date];
-                const ins = dayEntries.filter(e => e.type === 'in').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR')).join('; ');
-                const outs = dayEntries.filter(e => e.type === 'out').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR')).join('; ');
-                
-                let dailyWorkedMs = 0;
-                const sortedEntries = dayEntries.sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
-                for (let i = 0; i < sortedEntries.length - 1; i += 2) {
-                    if (sortedEntries[i].type === 'in' && sortedEntries[i+1].type === 'out') {
-                        dailyWorkedMs += sortedEntries[i+1].timestamp.toMillis() - sortedEntries[i].timestamp.toMillis();
-                    }
-                }
-
-                let dailyBalanceText = '---';
-                if (dayEntries.length % 2 === 0 && dayEntries.length > 0) {
-                    const dailyBalanceMs = dailyWorkedMs - (6 * 3600 * 1000);
-                    if (Math.abs(dailyBalanceMs) > (15 * 60 * 1000)) {
-                        totalMonthlyBalanceMs += dailyBalanceMs;
-                    }
-                    dailyBalanceText = Math.abs(dailyBalanceMs) <= (15 * 60 * 1000) ? '00:00:00' : formatMilliseconds(dailyBalanceMs, true);
-                }
-                csvContent += `${date},"${ins}","${outs}","${dailyBalanceText}"\n`;
-            });
-
-            const userName = allUsers.find(u => u.id === userId)?.name || 'Funcionario';
-            const monthName = new Date(year, month - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-            csvContent += `\nSaldo total do mês:,,"",${formatMilliseconds(totalMonthlyBalanceMs, true)}\n`;
-            
-            const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement("a");
-            const url = URL.createObjectURL(blob);
-            link.setAttribute("href", url);
-            link.setAttribute("download", `relatorio_ponto_${userName.toLowerCase().replace(/\s/g, '_')}_${month}_${year}.csv`);
-            link.style.visibility = 'hidden';
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-            ui.reportTitle.textContent = `Relatório de ${userName} para ${monthName} baixado com sucesso!`;
-        }
-        
         ui.userDropdown.addEventListener('change', async (e) => {
             const selectedUserId = e.target.value;
             if (selectedUserId) {
-                // Apenas renderiza a tabela para o funcionário selecionado, sem filtro de mês
                 ui.reportTitle.textContent = `Carregando dados...`;
                 ui.noReportMessage.classList.add('hidden');
                 ui.monthlyBalance.classList.add('hidden');
                 
                 const entriesRef = collection(db, 'artifacts', appId, 'users', selectedUserId, 'time_entries');
-                const entriesQuery = query(entriesRef, orderBy("timestamp", "asc"));
+                const entriesQuery = query(entriesRef, orderBy("timestamp", "desc"));
                 
                 if (unsubscribe.entries) unsubscribe.entries();
                 unsubscribe.entries = onSnapshot(entriesQuery, (snapshot) => {
@@ -360,12 +290,12 @@
             } else {
                 ui.reportTableBody.innerHTML = '';
                 ui.monthlyBalance.classList.add('hidden');
-                ui.reportTitle.textContent = '';
+                ui.reportTitle.textContent = 'Histórico de Registros';
                 ui.noReportMessage.classList.remove('hidden');
-                ui.noReportMessage.textContent = "Selecione um funcionário e um mês para gerar o relatório.";
+                ui.noReportMessage.textContent = "Selecione um funcionário para ver o relatório.";
             }
         });
-        
+
         function renderFullReportTable(entries, userId) {
             ui.reportTableBody.innerHTML = '';
             ui.noReportMessage.classList.add('hidden');
@@ -386,7 +316,7 @@
                 
                 row.innerHTML = `
                     <td class="px-6 py-4 whitespace-nowrap">${formattedDate}</td>
-                    <td class="px-6 py-4 whitespace-nowrap">${formattedTime}</td>
+                    <td class="px-6 py-4 whitespace-nowrap editable" data-record-id="${entry.id}" data-user-id="${userId}" data-original-time="${entryDate.toISOString()}">${formattedTime}</td>
                     <td class="px-6 py-4 whitespace-nowrap">${entryType}</td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <button class="delete-btn text-red-600 hover:text-red-900" data-record-id="${entry.id}" data-user-id="${userId}">
@@ -404,6 +334,21 @@
                         recordId: e.target.dataset.recordId
                     };
                     ui.deleteConfirmModal.style.display = 'flex';
+                });
+            });
+            
+            document.querySelectorAll('.editable').forEach(cell => {
+                cell.addEventListener('click', (e) => {
+                    const originalTime = new Date(e.target.dataset.originalTime);
+                    const hours = originalTime.getHours().toString().padStart(2, '0');
+                    const minutes = originalTime.getMinutes().toString().padStart(2, '0');
+                    ui.editTimeInput.value = `${hours}:${minutes}`;
+                    recordToEdit = {
+                        userId: e.target.dataset.userId,
+                        recordId: e.target.dataset.recordId,
+                        date: originalTime,
+                    };
+                    ui.editModal.style.display = 'flex';
                 });
             });
         }
@@ -425,6 +370,35 @@
         ui.cancelDeleteBtn.addEventListener('click', () => {
             recordToDelete = null;
             ui.deleteConfirmModal.style.display = 'none';
+        });
+
+        ui.saveEditBtn.addEventListener('click', async () => {
+            if (recordToEdit) {
+                const { userId, recordId, date } = recordToEdit;
+                const newTime = ui.editTimeInput.value;
+                const [newHours, newMinutes] = newTime.split(':').map(Number);
+                
+                const newDate = new Date(date);
+                newDate.setHours(newHours);
+                newDate.setMinutes(newMinutes);
+                newDate.setSeconds(0);
+
+                try {
+                    await updateDoc(doc(db, `artifacts/${appId}/users/${userId}/time_entries`, recordId), {
+                        timestamp: Timestamp.fromDate(newDate)
+                    });
+                } catch (error) {
+                    console.error("Erro ao editar registro:", error);
+                } finally {
+                    recordToEdit = null;
+                    ui.editModal.style.display = 'none';
+                }
+            }
+        });
+
+        ui.cancelEditBtn.addEventListener('click', () => {
+            recordToEdit = null;
+            ui.editModal.style.display = 'none';
         });
 
 
