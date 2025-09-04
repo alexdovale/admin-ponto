@@ -28,6 +28,7 @@
 <body class="bg-gray-100">
 
     <main class="py-12 px-4">
+        <!-- Tela de Login -->
         <div id="login-screen" class="w-full max-w-md">
             <div class="bg-white p-8 rounded-lg shadow-md space-y-6">
                 <div class="flex flex-col items-center">
@@ -45,6 +46,7 @@
             </div>
         </div>
 
+        <!-- Tela Principal do Admin -->
         <div id="app-screen" class="hidden w-full max-w-6xl">
             <div class="bg-white p-4 sm:p-8 rounded-lg shadow-md space-y-6">
                 <div class="flex flex-wrap justify-between items-center gap-4">
@@ -61,25 +63,29 @@
                 <div class="space-y-6">
                     <div>
                         <h2 class="text-xl font-bold mb-4">Relatórios de Ponto</h2>
-                        <select id="user-dropdown" class="w-full p-2 border rounded-md"></select>
+                        <select id="user-dropdown" class="w-full p-2 border rounded-md mb-4"></select>
+                        <div class="flex flex-wrap gap-4">
+                            <input type="month" id="month-selector" class="p-2 border rounded-md">
+                            <button id="generate-report-btn" class="py-2 px-4 rounded-md text-white bg-green-600 hover:bg-green-700">Gerar Relatório</button>
+                        </div>
                     </div>
                     
                     <div id="reports-container">
-                        <h3 class="text-lg font-medium">Histórico de Registros</h3>
+                        <h3 id="report-title" class="text-lg font-medium"></h3>
                         <div class="mt-4 overflow-x-auto">
                             <table class="min-w-full divide-y divide-gray-200">
                                 <thead class="bg-gray-50">
                                     <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Funcionário</th>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Entrada</th>
                                         <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saída</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saldo</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saldo do Dia</th>
                                     </tr>
                                 </thead>
                                 <tbody id="report-table-body" class="bg-white divide-y divide-gray-200"></tbody>
                             </table>
-                            <p id="no-report-message" class="text-center py-4 text-gray-500 hidden">Selecione um funcionário para ver o relatório.</p>
+                            <div id="monthly-balance" class="mt-4 p-4 bg-gray-100 rounded-md font-bold text-center hidden"></div>
+                            <p id="no-report-message" class="text-center py-4 text-gray-500 hidden">Selecione um funcionário e um mês para gerar o relatório.</p>
                         </div>
                     </div>
 
@@ -115,6 +121,7 @@
         </div>
     </footer>
     
+    <!-- Modals -->
     <div id="forgot-password-modal" class="modal">
         <div class="modal-content"><span id="close-forgot-modal-button" class="float-right text-2xl font-bold cursor-pointer">&times;</span><h3 class="text-lg font-medium mb-4">Redefinir Senha</h3><p class="text-sm text-gray-600 mb-4">Digite seu e-mail para receber um link de redefinição.</p><form id="forgot-password-form"><input id="forgot-email" type="email" required placeholder="Seu e-mail" class="w-full px-3 py-2 border rounded-md"><button type="submit" class="mt-4 w-full py-2 px-4 rounded-md text-white bg-green-600 hover:bg-green-700">Enviar Link</button></form><p id="modal-message" class="text-sm mt-4 text-center"></p></div>
     </div>
@@ -155,6 +162,10 @@
             userDropdown: document.getElementById('user-dropdown'),
             reportTableBody: document.getElementById('report-table-body'),
             noReportMessage: document.getElementById('no-report-message'),
+            monthSelector: document.getElementById('month-selector'),
+            generateReportBtn: document.getElementById('generate-report-btn'),
+            monthlyBalance: document.getElementById('monthly-balance'),
+            reportTitle: document.getElementById('report-title'),
             forgot: { modal: document.getElementById('forgot-password-modal'), link: document.getElementById('forgot-password-link'), close: document.getElementById('close-forgot-modal-button'), form: document.getElementById('forgot-password-form'), email: document.getElementById('forgot-email'), msg: document.getElementById('modal-message') },
         };
 
@@ -212,8 +223,8 @@
         function renderUserDropdown(users, role, team) {
             ui.userDropdown.innerHTML = '';
             const allOption = document.createElement('option');
-            allOption.value = 'all';
-            allOption.textContent = 'Todos os Funcionários';
+            allOption.value = '';
+            allOption.textContent = 'Selecione um funcionário';
             ui.userDropdown.appendChild(allOption);
             
             users.filter(u => u.role === 'employee').forEach(user => {
@@ -225,74 +236,94 @@
                 }
             });
         }
-
-        ui.userDropdown.addEventListener('change', (e) => {
-            const selectedUserId = e.target.value;
-            if (unsubscribe.entries) unsubscribe.entries();
-
-            if (selectedUserId === 'all') {
-                const entriesRef = collection(db, 'artifacts', appId, 'time_entries');
-                const entriesQuery = query(entriesRef, orderBy("timestamp", "desc"));
-                unsubscribe.entries = onSnapshot(entriesQuery, (snapshot) => {
-                    const entries = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-                    renderReportTable(entries, 'all');
-                });
+        
+        ui.generateReportBtn.addEventListener('click', () => {
+            const selectedUserId = ui.userDropdown.value;
+            const selectedDate = ui.monthSelector.value;
+            if (selectedUserId && selectedDate) {
+                const [year, month] = selectedDate.split('-');
+                generateMonthlyReport(selectedUserId, parseInt(month), parseInt(year));
             } else {
-                const entriesRef = collection(db, 'artifacts', appId, 'users', selectedUserId, 'time_entries');
-                const entriesQuery = query(entriesRef, orderBy("timestamp", "desc"));
-                unsubscribe.entries = onSnapshot(entriesQuery, (snapshot) => {
-                    const entries = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-                    renderReportTable(entries, selectedUserId);
-                });
+                ui.reportTableBody.innerHTML = '';
+                ui.monthlyBalance.classList.add('hidden');
+                ui.reportTitle.textContent = 'Histórico de Registros';
+                ui.noReportMessage.classList.remove('hidden');
+                ui.noReportMessage.textContent = "Por favor, selecione um funcionário e um mês para gerar o relatório.";
             }
         });
 
-        function renderReportTable(entries, selectedUserId) {
+        async function generateMonthlyReport(userId, month, year) {
+            ui.reportTitle.textContent = `Carregando dados...`;
+            ui.reportTableBody.innerHTML = '';
+            ui.monthlyBalance.classList.add('hidden');
+            ui.noReportMessage.classList.add('hidden');
+
+            const entriesRef = collection(db, 'artifacts', appId, 'users', userId, 'time_entries');
+            const entriesQuery = query(entriesRef, orderBy("timestamp", "asc"));
+            
+            const entriesSnapshot = await getDocs(entriesQuery);
+            const allEntries = entriesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+
+            const filteredEntries = allEntries.filter(entry => {
+                const entryDate = entry.timestamp.toDate();
+                return entryDate.getFullYear() === year && (entryDate.getMonth() + 1) === month;
+            });
+
+            if (filteredEntries.length === 0) {
+                ui.reportTitle.textContent = `Relatório para ${allUsers.find(u => u.id === userId)?.name}`;
+                ui.noReportMessage.classList.remove('hidden');
+                ui.noReportMessage.textContent = "Nenhum registro encontrado para o mês selecionado.";
+                return;
+            }
+
+            renderReportTable(filteredEntries, userId);
+        }
+
+        function renderReportTable(entries, userId) {
             ui.reportTableBody.innerHTML = '';
             ui.noReportMessage.classList.add('hidden');
+            ui.reportTitle.textContent = `Relatório para ${allUsers.find(u => u.id === userId)?.name}`;
             
             const entriesByDay = entries.reduce((acc, entry) => {
                 const date = entry.timestamp.toDate().toLocaleDateString('pt-BR');
-                const userId = entry.userId;
-                if (!acc[date]) acc[date] = {};
-                if (!acc[date][userId]) acc[date][userId] = { entries: [], userName: allUsers.find(u => u.id === userId)?.name || 'Desconhecido' };
-                acc[date][userId].entries.push(entry);
+                if (!acc[date]) acc[date] = [];
+                acc[date].push(entry);
                 return acc;
             }, {});
 
-            const sortedDates = Object.keys(entriesByDay).sort((a, b) => new Date(b.split('/').reverse().join('-')) - new Date(a.split('/').reverse().join('-')));
-            
-            sortedDates.forEach(date => {
-                const usersOnDate = Object.keys(entriesByDay[date]);
-                usersOnDate.forEach(userId => {
-                    const userData = entriesByDay[date][userId];
-                    const ins = userData.entries.filter(e => e.type === 'in').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR')).join(', ');
-                    const outs = userData.entries.filter(e => e.type === 'out').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR')).join(', ');
+            let totalMonthlyBalanceMs = 0;
 
-                    let dailyWorkedMs = 0;
-                    const sortedEntries = userData.entries.sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
-                    for (let i = 0; i < sortedEntries.length - 1; i += 2) {
-                        if (sortedEntries[i].type === 'in' && sortedEntries[i+1].type === 'out') {
-                            dailyWorkedMs += sortedEntries[i+1].timestamp.toMillis() - sortedEntries[i].timestamp.toMillis();
-                        }
+            Object.keys(entriesByDay).forEach(date => {
+                const dayEntries = entriesByDay[date];
+                const ins = dayEntries.filter(e => e.type === 'in').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR')).join(', ');
+                const outs = dayEntries.filter(e => e.type === 'out').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR')).join(', ');
+                
+                let dailyWorkedMs = 0;
+                const sortedEntries = dayEntries.sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
+                for (let i = 0; i < sortedEntries.length - 1; i += 2) {
+                    if (sortedEntries[i].type === 'in' && sortedEntries[i+1].type === 'out') {
+                        dailyWorkedMs += sortedEntries[i+1].timestamp.toMillis() - sortedEntries[i].timestamp.toMillis();
                     }
+                }
 
-                    let balanceText = '---', balanceClass = 'text-gray-700';
-                    if (userData.entries.length % 2 === 0 && userData.entries.length > 0) {
-                        const dailyBalanceMs = dailyWorkedMs - (6 * 3600 * 1000);
-                        balanceText = Math.abs(dailyBalanceMs) <= (15 * 60 * 1000) ? '00:00:00' : formatMilliseconds(dailyBalanceMs, true);
-                        balanceClass = dailyBalanceMs > 0 ? 'text-green-600' : 'text-red-600';
+                let dailyBalanceText = '---', dailyBalanceClass = 'text-gray-700';
+                if (dayEntries.length % 2 === 0 && dayEntries.length > 0) {
+                    const dailyBalanceMs = dailyWorkedMs - (6 * 3600 * 1000);
+                    if (Math.abs(dailyBalanceMs) > (15 * 60 * 1000)) {
+                        totalMonthlyBalanceMs += dailyBalanceMs;
                     }
+                    dailyBalanceText = Math.abs(dailyBalanceMs) <= (15 * 60 * 1000) ? '00:00:00' : formatMilliseconds(dailyBalanceMs, true);
+                    dailyBalanceClass = dailyBalanceMs > 0 ? 'text-green-600' : 'text-red-600';
+                }
 
-                    const row = document.createElement('tr');
-                    row.innerHTML = `<td class="px-6 py-4">${userData.userName}</td><td class="px-6 py-4">${date}</td><td class="px-6 py-4">${ins}</td><td class="px-6 py-4">${outs}</td><td class="px-6 py-4 font-medium ${balanceClass}">${balanceText}</td>`;
-                    ui.reportTableBody.appendChild(row);
-                });
+                const row = document.createElement('tr');
+                row.innerHTML = `<td class="px-6 py-4">${date}</td><td class="px-6 py-4">${ins}</td><td class="px-6 py-4">${outs}</td><td class="px-6 py-4 font-medium ${dailyBalanceClass}">${dailyBalanceText}</td>`;
+                ui.reportTableBody.appendChild(row);
             });
-            if (ui.reportTableBody.children.length === 0) {
-                 ui.noReportMessage.classList.remove('hidden');
-                 ui.noReportMessage.textContent = selectedUserId === 'all' ? 'Nenhum registro encontrado para todos os funcionários.' : 'Nenhum registro encontrado para este funcionário.';
-            }
+
+            ui.monthlyBalance.textContent = `Saldo total do mês: ${formatMilliseconds(totalMonthlyBalanceMs, true)}`;
+            ui.monthlyBalance.className = `mt-4 p-4 rounded-md font-bold text-center ${totalMonthlyBalanceMs >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
+            ui.monthlyBalance.classList.remove('hidden');
         }
 
         function renderRequestsTable(requests, users, role, team) {
