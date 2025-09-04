@@ -76,18 +76,13 @@
                         <h3 id="report-title" class="text-lg font-medium">Histórico de Registros</h3>
                         <div class="mt-4 overflow-x-auto">
                             <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Entrada</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saída</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saldo do Dia</th>
-                                    </tr>
+                                <thead id="report-table-head" class="bg-gray-50">
+                                    <!-- O CABEÇALHO SERÁ INSERIDO AQUI VIA JAVASCRIPT -->
                                 </thead>
                                 <tbody id="report-table-body" class="bg-white divide-y divide-gray-200"></tbody>
                             </table>
                             <div id="monthly-balance" class="mt-4 p-4 bg-gray-100 rounded-md font-bold text-center hidden"></div>
-                            <p id="no-report-message" class="text-center py-4 text-gray-500 hidden">Selecione um funcionário para ver o relatório.</p>
+                            <p id="no-report-message" class="text-center py-4 text-gray-500">Selecione um funcionário para ver o relatório.</p>
                         </div>
                     </div>
 
@@ -187,9 +182,9 @@
             userNameSpan: document.getElementById('user-name'),
             logoutButton: document.getElementById('logout-button'),
             reportsContainer: document.getElementById('reports-container'),
-            reportVisualizationContainer: document.getElementById('report-visualization-container'),
             requestTableBody: document.getElementById('request-table-body'),
             userDropdown: document.getElementById('user-dropdown'),
+            reportTableHead: document.getElementById('report-table-head'),
             reportTableBody: document.getElementById('report-table-body'),
             noReportMessage: document.getElementById('no-report-message'),
             monthSelector: document.getElementById('month-selector'),
@@ -197,8 +192,6 @@
             downloadPdfBtn: null, // Será criado dinamicamente
             monthlyBalance: document.getElementById('monthly-balance'),
             reportTitle: document.getElementById('report-title'),
-            reportTitleVisual: null, // Será criado dinamicamente
-            reportMonthlyBalance: null, // Será criado dinamicamente
             deleteConfirmModal: document.getElementById('delete-confirm-modal'),
             cancelDeleteBtn: document.getElementById('cancel-delete-btn'),
             confirmDeleteBtn: document.getElementById('confirm-delete-btn'),
@@ -227,14 +220,10 @@
                         listenToFirebase(userRole, userTeam);
                     } else {
                         ui.loginError.textContent = "Acesso negado. Apenas gerentes podem acessar esta página.";
-                        ui.loginScreen.classList.remove('hidden');
-                        ui.appScreen.classList.add('hidden');
                         signOut(auth);
                     }
                 } else {
                     ui.loginError.textContent = "Perfil de usuário não encontrado ou incompleto.";
-                    ui.loginScreen.classList.remove('hidden');
-                    ui.appScreen.classList.add('hidden');
                     signOut(auth);
                 }
             } else {
@@ -279,7 +268,6 @@
             });
         }
         
-        // Listener para o botão de Gerar Relatório
         ui.generateReportBtn.addEventListener('click', async () => {
             const selectedUserId = ui.userDropdown.value;
             const selectedDate = ui.monthSelector.value;
@@ -289,13 +277,13 @@
             } else {
                 ui.reportTitle.textContent = 'Histórico de Registros';
                 ui.reportTableBody.innerHTML = '';
+                ui.reportTableHead.innerHTML = '';
                 ui.monthlyBalance.classList.add('hidden');
                 ui.noReportMessage.classList.remove('hidden');
                 ui.noReportMessage.textContent = "Por favor, selecione um funcionário e um mês para gerar o relatório.";
             }
         });
 
-        // NOVO: Função para gerar e renderizar o relatório mensal
         async function generateAndRenderMonthlyReport(userId, month, year) {
             ui.reportTitle.textContent = `Carregando dados...`;
             ui.reportTableBody.innerHTML = '';
@@ -329,6 +317,14 @@
             
             ui.reportTitle.textContent = `Relatório para ${userName} - ${monthName}`;
             ui.reportTableBody.innerHTML = '';
+            ui.reportTableHead.innerHTML = `
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Entradas</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saídas</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saldo do Dia</th>
+                </tr>
+            `;
             ui.noReportMessage.classList.add('hidden');
             
             const entriesByDay = entries.reduce((acc, entry) => {
@@ -371,53 +367,15 @@
             ui.monthlyBalance.textContent = `Saldo total do mês: ${formatMilliseconds(totalMonthlyBalanceMs, true)}`;
             ui.monthlyBalance.className = `mt-4 p-4 rounded-md font-bold text-center ${totalMonthlyBalanceMs >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
             ui.monthlyBalance.classList.remove('hidden');
-            
-            // Adiciona um botão de download para o relatório gerado
-            const downloadBtn = document.createElement('button');
-            downloadBtn.id = 'download-pdf-btn';
-            downloadBtn.className = 'py-2 px-4 rounded-md text-white bg-green-600 hover:bg-green-700 mt-4';
-            downloadBtn.textContent = 'Baixar PDF do Relatório';
-            ui.reportsContainer.appendChild(downloadBtn);
-
-            downloadBtn.addEventListener('click', async () => {
-                const reportElement = ui.reportsContainer;
-                const doc = new window.jspdf.jsPDF();
-
-                const canvas = await html2canvas(reportElement);
-                const imgData = canvas.toDataURL('image/png');
-                const imgWidth = 210; 
-                const pageHeight = 295;
-                const imgHeight = canvas.height * imgWidth / canvas.width;
-                let heightLeft = imgHeight;
-                let position = 0;
-
-                doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-                heightLeft -= pageHeight;
-
-                while (heightLeft >= 0) {
-                    position = heightLeft - imgHeight;
-                    doc.addPage();
-                    doc.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
-                    heightLeft -= pageHeight;
-                }
-                
-                const userName = allUsers.find(u => u.id === userId)?.name || 'Funcionario';
-                const monthName = new Date(year, month - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-                
-                doc.save(`Relatorio_Ponto_${userName.replace(/\s/g, '_')}_${monthName.replace(/\s/g, '_')}.pdf`);
-            });
         }
         
-        // Listener para o dropdown de usuário (agora exibe histórico completo)
         ui.userDropdown.addEventListener('change', async (e) => {
             const selectedUserId = e.target.value;
-            ui.reportsContainer.classList.remove('hidden');
             ui.monthlyBalance.classList.add('hidden');
             
-            if (ui.downloadPdfBtn) {
-                ui.downloadPdfBtn.remove();
-                ui.downloadPdfBtn = null;
-            }
+            // Remove o botão de PDF antigo, se existir
+            const oldPdfBtn = document.getElementById('download-pdf-btn');
+            if(oldPdfBtn) oldPdfBtn.remove();
 
             if (selectedUserId) {
                 ui.reportTitle.textContent = `Carregando histórico...`;
@@ -433,15 +391,23 @@
                 });
             } else {
                 ui.reportTableBody.innerHTML = '';
+                ui.reportTableHead.innerHTML = '';
                 ui.reportTitle.textContent = 'Histórico de Registros';
                 ui.noReportMessage.classList.remove('hidden');
                 ui.noReportMessage.textContent = "Selecione um funcionário para ver o relatório.";
             }
         });
 
-        // NOVO: Função para renderizar a tabela detalhada com edição e exclusão
         function renderDetailedReportTable(entries, userId) {
             ui.reportTableBody.innerHTML = '';
+            ui.reportTableHead.innerHTML = `
+                <tr>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Horário</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Tipo</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+                </tr>
+            `;
             ui.noReportMessage.classList.add('hidden');
             ui.reportTitle.textContent = `Histórico Completo para ${allUsers.find(u => u.id === userId)?.name}`;
 
@@ -483,7 +449,8 @@
             
             document.querySelectorAll('.editable').forEach(cell => {
                 cell.addEventListener('click', (e) => {
-                    const originalTime = new Date(e.target.dataset.original-time);
+                    // CORREÇÃO AQUI: de .original-time para .originalTime
+                    const originalTime = new Date(e.target.dataset.originalTime);
                     const hours = originalTime.getHours().toString().padStart(2, '0');
                     const minutes = originalTime.getMinutes().toString().padStart(2, '0');
                     ui.editTimeInput.value = `${hours}:${minutes}`;
@@ -545,7 +512,6 @@
             ui.editModal.style.display = 'none';
         });
 
-
         function renderRequestsTable(requests, users, role, team) {
             ui.requestTableBody.innerHTML = '';
             requests.forEach(req => {
@@ -586,8 +552,8 @@
 
         function updateClock() {
             const now = new Date();
-            ui.headerDateSpan.textContent = now.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-            setTimeout(updateClock, 1000);
+            document.getElementById('header-date').textContent = now.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+            setTimeout(updateClock, 60000); // Atualiza a cada minuto
         }
         updateClock();
 
