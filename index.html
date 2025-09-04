@@ -66,9 +66,11 @@
                     <div>
                         <h2 class="text-xl font-bold mb-4">Relatórios de Ponto</h2>
                         <select id="user-dropdown" class="w-full p-2 border rounded-md mb-4"></select>
-                        <div class="flex flex-wrap gap-4">
+                        <div class="flex flex-wrap gap-4 items-center">
                             <input type="month" id="month-selector" class="p-2 border rounded-md">
                             <button id="generate-report-btn" class="py-2 px-4 rounded-md text-white bg-green-600 hover:bg-green-700">Gerar Relatório</button>
+                            <!-- BOTÃO DE PDF ADICIONADO AQUI -->
+                            <button id="download-pdf-btn" class="py-2 px-4 rounded-md text-white bg-blue-600 hover:bg-blue-700 hidden">Baixar PDF</button>
                         </div>
                     </div>
                     
@@ -146,9 +148,9 @@
         </div>
     </div>
 
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <!-- SCRIPTS PARA PDF -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -161,7 +163,7 @@
             apiKey: "AIzaSyBqWlyh2vo0I_gRWysG2NYdz0gvopRO3SI",
             authDomain: "sistema-ponto-v2.firebaseapp.com",
             projectId: "sistema-ponto-v2",
-            storageBucket: "sistema-ponto-v2.firebasestorage.app",
+            storageBucket: "sistema-ponto-v2.appspot.com",
             messagingSenderId: "582643132528",
             appId: "1:582643132528:web:2d489ae3c23786152a2cb5",
             measurementId: "G-E1SLMCBYZV"
@@ -189,7 +191,7 @@
             noReportMessage: document.getElementById('no-report-message'),
             monthSelector: document.getElementById('month-selector'),
             generateReportBtn: document.getElementById('generate-report-btn'),
-            downloadPdfBtn: null, // Será criado dinamicamente
+            downloadPdfBtn: document.getElementById('download-pdf-btn'), // Referência para o novo botão
             monthlyBalance: document.getElementById('monthly-balance'),
             reportTitle: document.getElementById('report-title'),
             deleteConfirmModal: document.getElementById('delete-confirm-modal'),
@@ -279,6 +281,7 @@
                 ui.reportTableBody.innerHTML = '';
                 ui.reportTableHead.innerHTML = '';
                 ui.monthlyBalance.classList.add('hidden');
+                ui.downloadPdfBtn.classList.add('hidden');
                 ui.noReportMessage.classList.remove('hidden');
                 ui.noReportMessage.textContent = "Por favor, selecione um funcionário e um mês para gerar o relatório.";
             }
@@ -288,6 +291,7 @@
             ui.reportTitle.textContent = `Carregando dados...`;
             ui.reportTableBody.innerHTML = '';
             ui.monthlyBalance.classList.add('hidden');
+            ui.downloadPdfBtn.classList.add('hidden');
             ui.noReportMessage.classList.add('hidden');
 
             const entriesRef = collection(db, 'artifacts', appId, 'users', userId, 'time_entries');
@@ -336,7 +340,7 @@
 
             let totalMonthlyBalanceMs = 0;
 
-            Object.keys(entriesByDay).forEach(date => {
+            Object.keys(entriesByDay).sort((a, b) => new Date(a.split('/').reverse().join('-')) - new Date(b.split('/').reverse().join('-'))).forEach(date => {
                 const dayEntries = entriesByDay[date];
                 const ins = dayEntries.filter(e => e.type === 'in').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).join(', ');
                 const outs = dayEntries.filter(e => e.type === 'out').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).join(', ');
@@ -344,7 +348,7 @@
                 let dailyWorkedMs = 0;
                 const sortedEntries = dayEntries.sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
                 for (let i = 0; i < sortedEntries.length - 1; i += 2) {
-                    if (sortedEntries[i].type === 'in' && sortedEntries[i+1].type === 'out') {
+                    if (sortedEntries[i].type === 'in' && sortedEntries[i+1] && sortedEntries[i+1].type === 'out') {
                         dailyWorkedMs += sortedEntries[i+1].timestamp.toMillis() - sortedEntries[i].timestamp.toMillis();
                     }
                 }
@@ -356,7 +360,7 @@
                         totalMonthlyBalanceMs += dailyBalanceMs;
                     }
                     dailyBalanceText = Math.abs(dailyBalanceMs) <= (15 * 60 * 1000) ? '00:00' : formatMilliseconds(dailyBalanceMs, true);
-                    dailyBalanceClass = dailyBalanceMs > 0 ? 'text-green-600' : 'text-red-600';
+                    dailyBalanceClass = dailyBalanceMs >= 0 ? 'text-green-600' : 'text-red-600';
                 }
 
                 const row = document.createElement('tr');
@@ -367,16 +371,14 @@
             ui.monthlyBalance.textContent = `Saldo total do mês: ${formatMilliseconds(totalMonthlyBalanceMs, true)}`;
             ui.monthlyBalance.className = `mt-4 p-4 rounded-md font-bold text-center ${totalMonthlyBalanceMs >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
             ui.monthlyBalance.classList.remove('hidden');
+            ui.downloadPdfBtn.classList.remove('hidden'); // Mostra o botão de PDF
         }
         
         ui.userDropdown.addEventListener('change', async (e) => {
             const selectedUserId = e.target.value;
             ui.monthlyBalance.classList.add('hidden');
+            ui.downloadPdfBtn.classList.add('hidden'); // Esconde o botão de PDF ao trocar de usuário
             
-            // Remove o botão de PDF antigo, se existir
-            const oldPdfBtn = document.getElementById('download-pdf-btn');
-            if(oldPdfBtn) oldPdfBtn.remove();
-
             if (selectedUserId) {
                 ui.reportTitle.textContent = `Carregando histórico...`;
                 ui.noReportMessage.classList.add('hidden');
@@ -399,6 +401,7 @@
         });
 
         function renderDetailedReportTable(entries, userId) {
+            ui.downloadPdfBtn.classList.add('hidden'); // Garante que o botão de PDF está escondido na visão detalhada
             ui.reportTableBody.innerHTML = '';
             ui.reportTableHead.innerHTML = `
                 <tr>
@@ -542,29 +545,88 @@
             await updateDoc(requestDocRef, { status });
         }
 
+        function formatMilliseconds(ms, showSign = false) {
+            const isNegative = ms < 0;
+            if (isNegative) ms = -ms;
+            const hours = Math.floor(ms / 3600000);
+            const minutes = Math.floor((ms % 3600000) / 60000);
+            const sign = isNegative ? '-' : (showSign ? '+' : '');
+            return `${sign}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+        }
+        
+        // --- FUNÇÃO PARA GERAR PDF ---
+        function generatePdf() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+
+            const userName = allUsers.find(u => u.id === ui.userDropdown.value)?.name || 'Usuário';
+            const selectedDate = ui.monthSelector.value;
+            const [year, month] = selectedDate.split('-');
+            const monthName = new Date(year, month - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+
+            doc.setFontSize(18);
+            doc.text(`Relatório de Ponto - ${userName}`, 14, 22);
+            doc.setFontSize(12);
+            doc.text(`Período: ${monthName}`, 14, 30);
+
+            const head = [['Data', 'Entradas', 'Saídas', 'Saldo do Dia']];
+            const body = [];
+            const tableRows = ui.reportTableBody.querySelectorAll('tr');
+
+            tableRows.forEach(row => {
+                const rowData = [];
+                row.querySelectorAll('td').forEach(cell => {
+                    rowData.push(cell.innerText);
+                });
+                body.push(rowData);
+            });
+
+            doc.autoTable({
+                head: head,
+                body: body,
+                startY: 40,
+                theme: 'striped',
+                headStyles: { fillColor: [22, 160, 133] }, // Tom de verde
+            });
+
+            const finalY = doc.lastAutoTable.finalY;
+            doc.setFontSize(12);
+            doc.setFont('helvetica', 'bold');
+            const totalBalanceText = ui.monthlyBalance.textContent;
+            doc.text(totalBalanceText, 14, finalY + 10);
+
+            const safeUserName = userName.replace(/\s+/g, '_').toLowerCase();
+            const fileName = `relatorio_${safeUserName}_${month}_${year}.pdf`;
+            doc.save(fileName);
+        }
+
+        ui.downloadPdfBtn.addEventListener('click', generatePdf);
         ui.loginForm.addEventListener('submit', async (e) => { e.preventDefault(); ui.loginError.textContent = ''; try { await signInWithEmailAndPassword(auth, ui.loginForm.email.value, ui.loginForm.password.value); } catch (error) { ui.loginError.textContent = "E-mail ou senha inválidos."; } });
         ui.logoutButton.addEventListener('click', () => signOut(auth));
-        ui.forgot.link.addEventListener('click', () => ui.forgot.modal.style.display = 'flex');
-        ui.forgot.close.addEventListener('click', () => ui.forgot.modal.style.display = 'none');
-        ui.forgot.form.addEventListener('submit', async (e) => { e.preventDefault(); ui.forgot.msg.textContent = "A enviar..."; try { await sendPasswordResetEmail(auth, ui.forgot.email.value); ui.forgot.msg.textContent = "Link enviado!"; ui.forgot.msg.className = 'text-sm mt-4 text-center text-green-600';} catch (error) { ui.forgot.msg.textContent = "Erro ao enviar e-mail."; ui.forgot.msg.className = 'text-sm mt-4 text-center text-red-600';}});
-        window.onclick = (event) => { if (event.target == ui.forgot.modal) ui.forgot.modal.style.display = "none"; };
+        
+        // --- Lógica do Modal "Esqueci a Senha" ---
+        ui.forgot.link.addEventListener('click', (e) => { e.preventDefault(); ui.forgot.modal.style.display = 'flex'; });
+        ui.forgot.close.addEventListener('click', () => { ui.forgot.modal.style.display = 'none'; ui.forgot.msg.textContent = ''; });
+        ui.forgot.form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            ui.forgot.msg.textContent = 'Enviando...';
+            try {
+                await sendPasswordResetEmail(auth, ui.forgot.email.value);
+                ui.forgot.msg.textContent = 'Link de redefinição enviado para o seu e-mail!';
+                ui.forgot.msg.className = 'text-sm mt-4 text-center text-green-600';
+            } catch (error) {
+                ui.forgot.msg.textContent = 'Erro ao enviar e-mail. Verifique o endereço digitado.';
+                 ui.forgot.msg.className = 'text-sm mt-4 text-center text-red-600';
+            }
+        });
+        
+        // --- Data no Cabeçalho ---
+        document.getElementById('header-date').textContent = new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+        // --- Definir mês atual no seletor ---
+        const today = new Date();
+        const currentMonth = today.toISOString().substring(0, 7);
+        document.getElementById('month-selector').value = currentMonth;
 
-        function updateClock() {
-            const now = new Date();
-            document.getElementById('header-date').textContent = now.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-            setTimeout(updateClock, 60000); // Atualiza a cada minuto
-        }
-        updateClock();
-
-        function formatMilliseconds(ms, neg = false) { 
-            const s = ms < 0 ? '-' : ''; 
-            if(neg) ms = Math.abs(ms); 
-            else if(ms < 0) ms = 0; 
-            const t = Math.floor(ms / 1000); 
-            const h = Math.floor(t / 3600); 
-            const m = Math.floor((t % 3600) / 60); 
-            return `${s}${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`; 
-        }
     </script>
 </body>
 </html>
