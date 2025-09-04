@@ -7,358 +7,223 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
-        body {
-            font-family: 'Inter', sans-serif;
-        }
+        body { font-family: 'Inter', sans-serif; }
+        .modal { display: none; position: fixed; z-index: 50; left: 0; top: 0; width: 100%; height: 100%; overflow: auto; background-color: rgba(0,0,0,0.6); align-items: center; justify-content: center; }
+        .modal-content { background-color: #fefefe; padding: 2rem; border-radius: 0.5rem; width: 90%; max-width: 500px; }
     </style>
 </head>
 <body class="bg-gray-100">
 
-    <!-- Seção de Autenticação -->
-    <div id="login-section" class="container mx-auto p-4 sm:p-6 lg:p-8 flex items-center justify-center" style="min-height: 80vh;">
+    <div id="login-section" class="container mx-auto p-8 flex items-center justify-center min-h-screen">
         <div class="bg-white p-8 rounded-lg shadow-md w-full max-w-sm">
             <h2 class="text-xl font-bold mb-4 text-center">Acesso ao Painel</h2>
-            <form id="admin-login-form" class="space-y-4">
-                <div>
-                    <label for="admin-email-input" class="sr-only">Email</label>
-                    <input id="admin-email-input" name="email" type="email" required class="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="E-mail do Administrador">
-                </div>
-                <div>
-                    <label for="admin-password" class="sr-only">Senha</label>
-                    <input id="admin-password" name="password" type="password" required class="appearance-none rounded-md relative block w-full px-3 py-2 border border-gray-300 placeholder-gray-500 text-gray-900 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm" placeholder="Senha">
-                </div>
-                <div>
-                     <button type="submit" class="group relative w-full flex justify-center py-2 px-4 border border-transparent text-sm font-medium rounded-md text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500">
-                        Entrar
-                    </button>
-                </div>
-            </form>
+            <form id="admin-login-form" class="space-y-4"><input id="admin-email-input" type="email" required class="w-full px-3 py-2 border rounded-md" placeholder="E-mail do Administrador"><input id="admin-password" type="password" required class="w-full px-3 py-2 border rounded-md" placeholder="Senha"><button type="submit" class="w-full py-2 px-4 rounded-md text-white bg-indigo-600 hover:bg-indigo-700">Entrar</button></form>
             <p id="auth-error" class="mt-4 text-sm text-red-600 text-center"></p>
         </div>
     </div>
 
-    <!-- Painel de Dados do Administrador -->
     <div id="admin-panel" class="hidden container mx-auto p-4 sm:p-6 lg:p-8">
         <div class="flex flex-wrap justify-between items-center mb-6">
             <h1 class="text-3xl font-bold text-gray-900">Painel de Registos</h1>
-            <div>
-                <span id="admin-email" class="text-sm text-gray-600 mr-4"></span>
-                <button id="logout-button" class="px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-100 rounded-md hover:bg-indigo-200">
-                    Sair
-                </button>
-            </div>
+            <div><span id="admin-email" class="text-sm text-gray-600 mr-4"></span><button id="logout-button" class="px-4 py-2 text-sm font-medium text-indigo-600 bg-indigo-100 rounded-md hover:bg-indigo-200">Sair</button></div>
         </div>
-
-        <div class="bg-white p-6 rounded-lg shadow-md mb-6">
-            <h2 class="text-lg font-medium text-gray-700 mb-4">Resumo Geral do Período</h2>
-            <div id="general-summary" class="space-y-2">
-                <!-- Saldo por funcionário e por mês será inserido aqui -->
-                 <p class="text-gray-500 text-center">Nenhum saldo para exibir.</p>
-            </div>
-        </div>
-
+        <div class="bg-white p-6 rounded-lg shadow-md mb-6"><h2 class="text-lg font-medium text-gray-700 mb-4">Resumo Geral do Período</h2><div id="general-summary" class="space-y-4"><p class="text-gray-500 text-center">Nenhum saldo para exibir.</p></div></div>
         <div class="bg-white p-6 rounded-lg shadow-md">
             <div class="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-                <div>
-                    <label for="user-filter" class="block text-sm font-medium text-gray-700">Funcionário</label>
-                    <select id="user-filter" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-                        <option value="all">Todos os Funcionários</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="month-filter" class="block text-sm font-medium text-gray-700">Mês</label>
-                    <select id="month-filter" class="mt-1 block w-full pl-3 pr-10 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-                        <option value="all">Todos os Meses</option>
-                        <option value="1">Janeiro</option>
-                        <option value="2">Fevereiro</option>
-                        <option value="3">Março</option>
-                        <option value="4">Abril</option>
-                        <option value="5">Maio</option>
-                        <option value="6">Junho</option>
-                        <option value="7">Julho</option>
-                        <option value="8">Agosto</option>
-                        <option value="9">Setembro</option>
-                        <option value="10">Outubro</option>
-                        <option value="11">Novembro</option>
-                        <option value="12">Dezembro</option>
-                    </select>
-                </div>
-                <div>
-                    <label for="year-filter" class="block text-sm font-medium text-gray-700">Ano</label>
-                    <input type="number" id="year-filter" placeholder="Ex: 2024" class="mt-1 block w-full pl-3 pr-2 py-2 text-base border-gray-300 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm rounded-md">
-                </div>
+                <div><label for="user-filter" class="block text-sm font-medium">Funcionário</label><select id="user-filter" class="mt-1 block w-full py-2 px-3 border rounded-md"><option value="all">Todos</option></select></div>
+                <div><label for="month-filter" class="block text-sm font-medium">Mês</label><select id="month-filter" class="mt-1 block w-full py-2 px-3 border rounded-md"><option value="all">Todos</option><option value="1">Janeiro</option><option value="2">Fevereiro</option><option value="3">Março</option><option value="4">Abril</option><option value="5">Maio</option><option value="6">Junho</option><option value="7">Julho</option><option value="8">Agosto</option><option value="9">Setembro</option><option value="10">Outubro</option><option value="11">Novembro</option><option value="12">Dezembro</option></select></div>
+                <div><label for="year-filter" class="block text-sm font-medium">Ano</label><input type="number" id="year-filter" placeholder="Ex: 2025" class="mt-1 block w-full py-2 px-3 border rounded-md"></div>
             </div>
-
             <div class="overflow-x-auto">
                 <table class="min-w-full divide-y divide-gray-200">
                     <thead class="bg-gray-50">
                         <tr>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Funcionário</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Entradas</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Saídas</th>
-                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Saldo do Dia</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase">Funcionário</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Data</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase">Entradas</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Saídas</th>
+                            <th class="px-6 py-3 text-left text-xs font-medium uppercase">Saldo</th><th class="px-6 py-3 text-left text-xs font-medium uppercase">Ações</th>
                         </tr>
                     </thead>
-                    <tbody id="records-table-body" class="bg-white divide-y divide-gray-200">
-                        <!-- Os dados serão inseridos aqui -->
-                    </tbody>
+                    <tbody id="records-table-body" class="bg-white divide-y divide-gray-200"></tbody>
                 </table>
-                <p id="loading-message" class="text-center py-8 text-gray-500">A carregar registos...</p>
+                <p id="loading-message" class="text-center py-8 text-gray-500">A carregar...</p>
             </div>
         </div>
+    </div>
+    
+    <div id="edit-modal" class="modal">
+        <div class="modal-content"><h3 id="modal-title" class="text-lg font-bold mb-4">Editar Registos</h3><div id="edit-fields-container" class="space-y-4"></div><div class="mt-6 flex justify-end gap-4"><button id="cancel-edit-button" class="px-4 py-2 rounded-md bg-gray-200">Cancelar</button><button id="save-edit-button" class="px-4 py-2 rounded-md text-white bg-indigo-600">Salvar</button></div><p id="modal-error" class="text-sm text-red-600 mt-2"></p></div>
+    </div>
+    <div id="request-view-modal" class="modal">
+        <div class="modal-content"><h3 id="request-view-title" class="text-lg font-bold mb-4">Ver Solicitação</h3><div class="p-4 bg-gray-100 rounded-md mb-4"><p id="request-view-text" class="text-gray-800 whitespace-pre-wrap"></p></div><div class="mt-6 flex justify-end gap-4"><button id="decline-request-button" class="px-4 py-2 rounded-md text-white bg-red-600">Recusar</button><button id="approve-request-button" class="px-4 py-2 rounded-md text-white bg-green-600">Aprovar</button><button id="close-request-view-button" class="px-4 py-2 rounded-md bg-gray-200">Fechar</button></div></div>
     </div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { 
-            getAuth, 
-            onAuthStateChanged,
-            signOut,
-            signInWithEmailAndPassword,
-            setPersistence,
-            browserSessionPersistence
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { 
-            getFirestore, 
-            collection, 
-            getDocs,
-            query,
-            collectionGroup,
-            setLogLevel
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, onAuthStateChanged, signOut, signInWithEmailAndPassword, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, getDocs, query, collectionGroup, setLogLevel, doc, writeBatch, Timestamp, updateDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : {
-            apiKey: "AIzaSyBqWlyh2vo0I_gRWysG2NYdz0gvopRO3SI",
-            authDomain: "sistema-ponto-v2.firebaseapp.com",
-            projectId: "sistema-ponto-v2",
-            storageBucket: "sistema-ponto-v2.firebasestorage.app",
-            messagingSenderId: "582643132528",
-            appId: "1:582643132528:web:2d489ae3c23786152a2cb5"
-        };
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "AIzaSyBqWlyh2vo0I_gRWysG2NYdz0gvopRO3SI", authDomain: "sistema-ponto-v2.firebaseapp.com", projectId: "sistema-ponto-v2", storageBucket: "sistema-ponto-v2.firebasestorage.app", messagingSenderId: "582643132528", appId: "1:582643132528:web:2d489ae3c23786152a2cb5" };
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
 
         const app = initializeApp(firebaseConfig);
         const auth = getAuth(app);
         const db = getFirestore(app);
-        setLogLevel('Debug');
-
-        const loginSection = document.getElementById('login-section');
-        const adminPanel = document.getElementById('admin-panel');
-        const adminLoginForm = document.getElementById('admin-login-form');
-        const adminEmailInput = document.getElementById('admin-email-input');
-        const adminPasswordInput = document.getElementById('admin-password');
-        const authError = document.getElementById('auth-error');
-        const logoutButton = document.getElementById('logout-button');
-        const adminEmailSpan = document.getElementById('admin-email');
-        const generalSummaryEl = document.getElementById('general-summary');
-        const userFilter = document.getElementById('user-filter');
-        const monthFilter = document.getElementById('month-filter');
-        const yearFilter = document.getElementById('year-filter');
-        const tableBody = document.getElementById('records-table-body');
-        const loadingMessage = document.getElementById('loading-message');
-
-        let allRecords = [];
-        let usersMap = {};
         
-        // Autenticação
+        const ui = {
+            loginSection: document.getElementById('login-section'), adminPanel: document.getElementById('admin-panel'), adminLoginForm: document.getElementById('admin-login-form'), authError: document.getElementById('auth-error'), logoutButton: document.getElementById('logout-button'), adminEmailSpan: document.getElementById('admin-email'),
+            summary: document.getElementById('general-summary'), userFilter: document.getElementById('user-filter'), monthFilter: document.getElementById('month-filter'), yearFilter: document.getElementById('year-filter'), tableBody: document.getElementById('records-table-body'), loading: document.getElementById('loading-message'),
+            edit: { modal: document.getElementById('edit-modal'), title: document.getElementById('modal-title'), fields: document.getElementById('edit-fields-container'), cancel: document.getElementById('cancel-edit-button'), save: document.getElementById('save-edit-button'), error: document.getElementById('modal-error') },
+            request: { modal: document.getElementById('request-view-modal'), title: document.getElementById('request-view-title'), text: document.getElementById('request-view-text'), approve: document.getElementById('approve-request-button'), decline: document.getElementById('decline-request-button'), close: document.getElementById('close-request-view-button') }
+        };
+
+        let allRecords = [], usersMap = {}, allRequests = [], currentDayEntries = [], currentRequest = null;
+        
         onAuthStateChanged(auth, async (user) => {
+            ui.loginSection.classList.toggle('hidden', !!user);
+            ui.adminPanel.classList.toggle('hidden', !user);
             if (user) {
-                loginSection.classList.add('hidden');
-                adminPanel.classList.remove('hidden');
-                adminEmailSpan.textContent = user.email;
-                yearFilter.value = new Date().getFullYear(); // Preenche o ano atual
+                ui.adminEmailSpan.textContent = user.email;
+                ui.yearFilter.value = new Date().getFullYear();
                 await loadAllData();
-            } else {
-                loginSection.classList.remove('hidden');
-                adminPanel.classList.add('hidden');
             }
         });
-
-        adminLoginForm.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            authError.textContent = '';
-            const email = adminEmailInput.value;
-            const password = adminPasswordInput.value;
-            try {
-                await setPersistence(auth, browserSessionPersistence);
-                await signInWithEmailAndPassword(auth, email, password);
-            } catch (error) {
-                console.error("Login error:", error);
-                authError.textContent = "E-mail ou senha inválidos.";
-            }
-        });
-
-        logoutButton.addEventListener('click', () => signOut(auth));
-
-        // Carregamento dos dados
+        
         async function loadAllData() {
-            loadingMessage.textContent = "A buscar nomes dos funcionários...";
-            
+            ui.loading.textContent = "A carregar dados...";
             try {
-                const usersSnapshot = await getDocs(collection(db, "users"));
+                const [usersSnap, recordsSnap, requestsSnap] = await Promise.all([
+                    getDocs(collection(db, "users")),
+                    getDocs(query(collectionGroup(db, 'time_entries'))),
+                    getDocs(collection(db, `/artifacts/${appId}/requests`))
+                ]);
                 usersMap = {};
-                usersSnapshot.forEach(doc => {
-                    usersMap[doc.id] = doc.data().name || 'Nome não encontrado';
-                });
+                usersSnap.forEach(doc => usersMap[doc.id] = doc.data().name || 'Nome não encontrado');
+                allRecords = recordsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                allRequests = requestsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 populateUserFilter();
-            } catch (e) {
-                loadingMessage.textContent = "Erro: Não foi possível carregar a lista de funcionários. Verifique as regras de segurança.";
-                return;
-            }
-
-            loadingMessage.textContent = "A buscar todos os registos de ponto...";
-            
-            try {
-                const entriesQuery = query(collectionGroup(db, 'time_entries'));
-                const entriesSnapshot = await getDocs(entriesQuery);
-                allRecords = [];
-                entriesSnapshot.forEach(doc => {
-                    allRecords.push({ id: doc.id, ...doc.data() });
-                });
                 renderTable();
             } catch (e) {
-                loadingMessage.textContent = "Erro: Não foi possível carregar os registos. Verifique as regras de segurança.";
+                ui.loading.textContent = "Erro ao carregar dados. Verifique as regras de segurança.";
             }
         }
-
-        function populateUserFilter() {
-            userFilter.innerHTML = '<option value="all">Todos os Funcionários</option>';
-            for (const uid in usersMap) {
-                const option = document.createElement('option');
-                option.value = uid;
-                option.textContent = usersMap[uid];
-                userFilter.appendChild(option);
-            }
-        }
-
-        // Renderização e Filtros
+        
         function renderTable() {
-            const selectedUserId = userFilter.value;
-            const selectedMonth = monthFilter.value;
-            const selectedYear = yearFilter.value;
-
-            const filteredRecords = allRecords.filter(record => {
-                const isUserMatch = selectedUserId === 'all' || record.userId === selectedUserId;
-                const recordDate = record.timestamp.toDate();
-                const isMonthMatch = selectedMonth === 'all' || (recordDate.getMonth() + 1) == selectedMonth;
-                const isYearMatch = !selectedYear || recordDate.getFullYear() == selectedYear;
-                return isUserMatch && isMonthMatch && isYearMatch;
+            const filteredRecords = allRecords.filter(r => {
+                const d = r.timestamp.toDate();
+                return (ui.userFilter.value === 'all' || r.userId === ui.userFilter.value) && (ui.monthFilter.value === 'all' || (d.getMonth() + 1) == ui.monthFilter.value) && (!ui.yearFilter.value || d.getFullYear() == ui.yearFilter.value);
             });
-
-            const recordsByDayAndUser = filteredRecords.reduce((acc, record) => {
-                const date = record.timestamp.toDate().toLocaleDateString('pt-BR');
-                const key = `${record.userId}-${date}`;
-                if (!acc[key]) {
-                    acc[key] = { userName: usersMap[record.userId] || record.userId, date: date, entries: [] };
-                }
-                acc[key].entries.push(record);
-                return acc;
-            }, {});
-
-            tableBody.innerHTML = '';
+            const recordsByDay = filteredRecords.reduce((acc, r) => { (acc[`${r.userId}-${r.timestamp.toDate().toISOString().split('T')[0]}`] ||= []).push(r); return acc; }, {});
             
-            if (Object.keys(recordsByDayAndUser).length === 0) {
-                loadingMessage.textContent = "Nenhum registo encontrado para os filtros selecionados.";
-                loadingMessage.classList.remove('hidden');
-                generalSummaryEl.innerHTML = '<p class="text-gray-500 text-center">Nenhum saldo para exibir.</p>';
-                return;
-            }
-            loadingMessage.classList.add('hidden');
+            ui.tableBody.innerHTML = '';
+            ui.loading.classList.toggle('hidden', Object.keys(recordsByDay).length > 0);
+            if(Object.keys(recordsByDay).length === 0) { ui.loading.textContent = "Nenhum registo encontrado."; renderSummary({}); return; }
 
-            const monthlyUserBalances = {};
-
-            const sortedKeys = Object.keys(recordsByDayAndUser).sort((a, b) => {
-                const dateAStr = a.split('-').slice(1).join('-').split('/').reverse().join('-');
-                const dateBStr = b.split('-').slice(1).join('-').split('/').reverse().join('-');
-                return new Date(dateBStr) - new Date(dateAStr);
-            });
-
-            sortedKeys.forEach(key => {
-                const dayData = recordsByDayAndUser[key];
-                const userId = key.split('-')[0];
+            const monthlyBalances = {};
+            Object.keys(recordsByDay).sort().reverse().forEach(key => {
+                const dayEntries = recordsByDay[key].sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
+                const { userId } = dayEntries[0];
+                const date = dayEntries[0].timestamp.toDate();
+                const dateStr = date.toLocaleDateString('pt-BR');
+                let workedMs = 0;
+                for (let i=0; i < dayEntries.length - 1; i+=2) if(dayEntries[i].type==='in'&&dayEntries[i+1].type==='out') workedMs += dayEntries[i+1].timestamp.toMillis() - dayEntries[i].timestamp.toMillis();
                 
-                dayData.entries.sort((a, b) => a.timestamp.toMillis() - b.timestamp.toMillis());
-                const ins = dayData.entries.filter(e => e.type === 'in').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR'));
-                const outs = dayData.entries.filter(e => e.type === 'out').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR'));
-                let dailyWorkedMs = 0;
-                for (let i = 0; i < dayData.entries.length - 1; i += 2) {
-                    if (dayData.entries[i].type === 'in' && dayData.entries[i+1].type === 'out') {
-                        dailyWorkedMs += dayData.entries[i+1].timestamp.toMillis() - dayData.entries[i].timestamp.toMillis();
-                    }
+                let balanceText = '---', balanceClass = 'text-gray-700';
+                if (dayEntries.length % 2 === 0 && dayEntries.length > 0) {
+                    const balanceMs = workedMs - (6*3600*1000);
+                    balanceText = formatMilliseconds(balanceMs, true);
+                    balanceClass = balanceMs >= 0 ? 'text-green-600' : 'text-red-600';
+                    const monthKey = `${date.getMonth()+1}/${date.getFullYear()}`;
+                    (monthlyBalances[monthKey] ||= {})[userId] ||= { name: usersMap[userId] || userId, balanceMs: 0 };
+                    monthlyBalances[monthKey][userId].balanceMs += balanceMs;
                 }
-                let balanceText = '---';
-                let balanceClass = 'text-gray-700';
-                if (dayData.entries.length % 2 === 0 && dayData.entries.length > 0) {
-                    const WORKDAY_MS = 6 * 60 * 60 * 1000;
-                    const dailyBalanceMs = dailyWorkedMs - WORKDAY_MS;
-                    balanceText = formatMilliseconds(dailyBalanceMs, true);
-                    balanceClass = dailyBalanceMs >= 0 ? 'text-green-600' : 'text-red-600';
-                    
-                    // Agrupa saldos por mês
-                    const recordDate = dayData.entries[0].timestamp.toDate();
-                    const monthKey = `${recordDate.getMonth() + 1}/${recordDate.getFullYear()}`;
-                    if (!monthlyUserBalances[monthKey]) monthlyUserBalances[monthKey] = {};
-                    if (!monthlyUserBalances[monthKey][userId]) {
-                         monthlyUserBalances[monthKey][userId] = { name: usersMap[userId] || userId, balanceMs: 0 };
-                    }
-                    monthlyUserBalances[monthKey][userId].balanceMs += dailyBalanceMs;
+                
+                const request = allRequests.find(r => r.userId === userId && r.date === dateStr);
+                let requestIcon = '';
+                if (request) {
+                    const color = { pending: 'text-yellow-500', approved: 'text-green-500', declined: 'text-red-500' }[request.status];
+                    requestIcon = `<button class="request-view-btn"><svg class="w-6 h-6 ${color}" fill="currentColor" viewBox="0 0 20 20"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"/><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"/></svg></button>`;
                 }
-                const row = `<tr class="text-sm"><td class="px-6 py-4 whitespace-nowrap font-medium text-gray-900">${dayData.userName}</td><td class="px-6 py-4 whitespace-nowrap text-gray-500">${dayData.date}</td><td class="px-6 py-4 whitespace-nowrap text-gray-500">${ins.join(', ')}</td><td class="px-6 py-4 whitespace-nowrap text-gray-500">${outs.join(', ')}</td><td class="px-6 py-4 whitespace-nowrap font-medium ${balanceClass}">${balanceText}</td></tr>`;
-                tableBody.innerHTML += row;
+
+                const row = ui.tableBody.insertRow();
+                row.innerHTML = `<td class="px-6 py-4">${usersMap[userId]}</td><td class="px-6 py-4">${dateStr}</td><td class="px-6 py-4">${dayEntries.filter(e=>e.type==='in').map(e=>e.timestamp.toDate().toLocaleTimeString('pt-BR')).join(', ')}</td><td class="px-6 py-4">${dayEntries.filter(e=>e.type==='out').map(e=>e.timestamp.toDate().toLocaleTimeString('pt-BR')).join(', ')}</td><td class="px-6 py-4 font-medium ${balanceClass}">${balanceText}</td><td class="px-6 py-4"><button class="edit-btn text-indigo-600 hover:text-indigo-900">Editar</button> ${requestIcon}</td>`;
+                row.querySelector('.edit-btn').addEventListener('click', () => openEditModal(dayEntries));
+                if(request) row.querySelector('.request-view-btn').addEventListener('click', () => openRequestViewModal(request));
             });
+            renderSummary(monthlyBalances);
+        }
 
-            // Renderiza o Resumo Geral por Mês
-            generalSummaryEl.innerHTML = '';
-            const sortedMonthKeys = Object.keys(monthlyUserBalances).sort((a, b) => {
-                const [monthA, yearA] = a.split('/');
-                const [monthB, yearB] = b.split('/');
-                return new Date(yearB, monthB - 1) - new Date(yearA, monthA - 1);
-            });
-
-            if(sortedMonthKeys.length === 0){
-                 generalSummaryEl.innerHTML = '<p class="text-gray-500 text-center">Nenhum saldo para exibir.</p>';
-                 return;
-            }
-            
-            sortedMonthKeys.forEach(monthKey => {
-                const [month, year] = monthKey.split('/');
-                const monthName = new Date(year, month - 1, 1).toLocaleString('pt-BR', { month: 'long' });
-                const monthTitle = `<h3 class="text-md font-semibold text-gray-600 mt-4 first:mt-0">${monthName.charAt(0).toUpperCase() + monthName.slice(1)} de ${year}</h3>`;
-                generalSummaryEl.innerHTML += monthTitle;
-
-                const userBalances = monthlyUserBalances[monthKey];
-                const sortedUserIds = Object.keys(userBalances).sort((a, b) => userBalances[a].name.localeCompare(userBalances[b].name));
-            
-                sortedUserIds.forEach(userId => {
-                    const userData = userBalances[userId];
-                    const totalBalanceText = formatMilliseconds(userData.balanceMs, true);
-                    const totalBalanceClass = userData.balanceMs >= 0 ? 'text-green-600' : 'text-red-600';
-                    const summaryItem = `
-                        <div class="flex justify-between items-center py-2 border-b border-gray-200 last:border-b-0">
-                            <span class="font-medium text-gray-800">${userData.name}</span>
-                            <span class="font-bold text-lg ${totalBalanceClass}">${totalBalanceText}</span>
-                        </div>
-                    `;
-                    generalSummaryEl.innerHTML += summaryItem;
+        function renderSummary(balances) {
+            ui.summary.innerHTML = '';
+            const sortedMonths = Object.keys(balances).sort((a,b) => new Date(b.split('/')[1], b.split('/')[0]-1) - new Date(a.split('/')[1], a.split('/')[0]-1));
+            if(sortedMonths.length === 0) { ui.summary.innerHTML = '<p class="text-gray-500 text-center">Nenhum saldo para exibir.</p>'; return; }
+            sortedMonths.forEach(monthKey => {
+                const [m, y] = monthKey.split('/');
+                const monthName = new Date(y, m-1).toLocaleString('pt-BR', {month:'long'});
+                ui.summary.innerHTML += `<h3 class="text-md font-semibold mt-4 first:mt-0">${monthName.charAt(0).toUpperCase()+monthName.slice(1)} de ${y}</h3>`;
+                const userBalances = balances[monthKey];
+                Object.keys(userBalances).sort((a,b) => userBalances[a].name.localeCompare(userBalances[b].name)).forEach(userId => {
+                    const u = userBalances[userId];
+                    const balanceText = formatMilliseconds(u.balanceMs, true);
+                    const balanceClass = u.balanceMs >= 0 ? 'text-green-600' : 'text-red-600';
+                    ui.summary.innerHTML += `<div class="flex justify-between py-2 border-b"><span class="font-medium">${u.name}</span><span class="font-bold text-lg ${balanceClass}">${balanceText}</span></div>`;
                 });
             });
         }
         
-        function formatMilliseconds(ms, allowNegative = false) {
-            const isNegative = ms < 0;
-            const sign = isNegative ? '-' : '';
-            if (allowNegative) ms = Math.abs(ms);
-            else if (isNegative) ms = 0;
-            const totalSeconds = Math.floor(ms / 1000);
-            const hours = Math.floor(totalSeconds / 3600);
-            const minutes = Math.floor((totalSeconds % 3600) / 60);
-            return `${sign}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+        function openEditModal(dayEntries) {
+            currentDayEntries = dayEntries;
+            ui.edit.error.textContent = '';
+            ui.edit.title.textContent = `Editar Registos de ${usersMap[dayEntries[0].userId]} - ${dayEntries[0].timestamp.toDate().toLocaleDateString('pt-BR')}`;
+            ui.edit.fields.innerHTML = dayEntries.map((entry, i) => `<div class="grid grid-cols-3 items-center gap-2"><label class="font-medium">${entry.type==='in'?'Entrada':'Saída'} ${Math.floor(i/2)+1}</label><input type="time" step="1" value="${entry.timestamp.toDate().toTimeString().slice(0,8)}" data-entry-id="${entry.id}" class="col-span-2 w-full px-3 py-2 border rounded-md"></div>`).join('');
+            ui.edit.modal.style.display = 'flex';
         }
 
-        userFilter.addEventListener('change', renderTable);
-        monthFilter.addEventListener('change', renderTable);
-        yearFilter.addEventListener('change', renderTable);
+        function openRequestViewModal(request) {
+            currentRequest = request;
+            ui.request.title.textContent = `Solicitação de ${request.userName} - ${request.date}`;
+            ui.request.text.textContent = request.text;
+            const isPending = request.status === 'pending';
+            ui.request.approve.classList.toggle('hidden', !isPending);
+            ui.request.decline.classList.toggle('hidden', !isPending);
+            ui.request.modal.style.display = 'flex';
+        }
+        
+        async function saveTimeChanges() {
+            const batch = writeBatch(db);
+            const inputs = ui.edit.fields.querySelectorAll('input[type="time"]');
+            for (const input of inputs) {
+                const entry = currentDayEntries.find(e => e.id === input.dataset.entryId);
+                const [h, m, s] = input.value.split(':');
+                const newDate = new Date(entry.timestamp.toDate());
+                newDate.setHours(h, m, s || 0);
+                if (newDate.getTime() !== entry.timestamp.toDate().getTime()) {
+                    const docRef = doc(db, `/artifacts/${appId}/users/${entry.userId}/time_entries/${entry.id}`);
+                    batch.update(docRef, { timestamp: Timestamp.fromDate(newDate) });
+                }
+            }
+            try { await batch.commit(); ui.edit.modal.style.display = 'none'; await loadAllData(); } catch (error) { ui.edit.error.textContent = "Falha ao salvar."; }
+        }
+        
+        async function handleRequest(status) {
+            if (!currentRequest) return;
+            const docRef = doc(db, `/artifacts/${appId}/requests/${currentRequest.id}`);
+            try {
+                await updateDoc(docRef, { status });
+                ui.request.modal.style.display = 'none';
+                await loadAllData();
+            } catch (error) { alert('Falha ao atualizar a solicitação.'); }
+        }
+
+        ui.adminLoginForm.addEventListener('submit', async (e) => { e.preventDefault(); ui.authError.textContent = ''; try { await setPersistence(auth, browserSessionPersistence); await signInWithEmailAndPassword(auth, ui.adminLoginForm.email.value, ui.adminLoginForm.password.value); } catch (error) { ui.authError.textContent = "E-mail ou senha inválidos."; }});
+        ui.logoutButton.addEventListener('click', () => signOut(auth));
+        [ui.userFilter, ui.monthFilter, ui.yearFilter].forEach(el => el.addEventListener('change', renderTable));
+        ui.edit.cancel.addEventListener('click', () => ui.edit.modal.style.display = 'none');
+        ui.edit.save.addEventListener('click', saveTimeChanges);
+        ui.request.close.addEventListener('click', () => ui.request.modal.style.display = 'none');
+        ui.request.approve.addEventListener('click', () => handleRequest('approved'));
+        ui.request.decline.addEventListener('click', () => handleRequest('declined'));
+        function populateUserFilter() { ui.userFilter.innerHTML = '<option value="all">Todos</option>'; Object.keys(usersMap).sort((a,b) => usersMap[a].localeCompare(usersMap[b])).forEach(uid => { const o = document.createElement('option'); o.value = uid; o.textContent = usersMap[uid]; ui.userFilter.appendChild(o); }); }
+        function formatMilliseconds(ms, neg = false) { const s = ms < 0 ? '-' : ''; if(neg) ms=Math.abs(ms); else if(ms<0)ms=0; const t=Math.floor(ms/1000), h=Math.floor(t/3600), m=Math.floor((t%3600)/60); return `${s}${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`; }
     </script>
 </body>
 </html>
