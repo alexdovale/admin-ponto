@@ -123,10 +123,18 @@
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, query, onSnapshot, doc, getDoc, Timestamp, setLogLevel, where, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // ----- INFORMAÇÕES DE CONFIGURAÇÃO (ATUALIZE AQUI) -----
+        // ----- INFORMAÇÕES DE CONFIGURAÇÃO (ATUALIZADAS COM SEUS DADOS) -----
         const allowedIps = ["201.33.168.237", "SEU_IP_NUMERO_2_AQUI"];
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "AIzaSyBqWlyh2vo0I_gRWysG2NYdz0gvopRO3SI", authDomain: "sistema-ponto-v2.firebaseapp.com", projectId: "sistema-ponto-v2", storageBucket: "sistema-ponto-v2.firebasestorage.app", messagingSenderId: "582643132528", appId: "1:582643132528:web:2d489ae3c23786152a2cb5" };
+        const firebaseConfig = {
+            apiKey: "AIzaSyBqWlyh2vo0I_gRWysG2NYdz0gvopRO3SI",
+            authDomain: "sistema-ponto-v2.firebaseapp.com",
+            projectId: "sistema-ponto-v2",
+            storageBucket: "sistema-ponto-v2.firebasestorage.app",
+            messagingSenderId: "582643132528",
+            appId: "1:582643132528:web:2d489ae3c23786152a2cb5",
+            measurementId: "G-E1SLMCBYZV"
+        };
         
         let app, auth, db;
         try { 
@@ -142,216 +150,138 @@
             loginScreen: document.getElementById('login-screen'), appScreen: document.getElementById('app-screen'),
             loginForm: document.getElementById('login-form'), loginError: document.getElementById('login-error'),
             ipErrorMessage: document.getElementById('ip-error-message'), userNameSpan: document.getElementById('user-name'),
-            logoutButton: document.getElementById('logout-button'), clockInButton: document.getElementById('clock-in-button'),
-            clockOutButton: document.getElementById('clock-out-button'), headerDateSpan: document.getElementById('header-date'),
-            currentTimeSpan: document.getElementById('current-time'), accumulatedBalanceSpan: document.getElementById('accumulated-balance'),
-            totalWorkedSpan: document.getElementById('total-worked'), dailyBalanceSpan: document.getElementById('daily-balance'),
-            historyTableBody: document.getElementById('history-table-body'), noHistoryMessage: document.getElementById('no-history-message'),
-            forgot: { modal: document.getElementById('forgot-password-modal'), link: document.getElementById('forgot-password-link'), close: document.getElementById('close-forgot-modal-button'), form: document.getElementById('forgot-password-form'), email: document.getElementById('forgot-email'), msg: document.getElementById('modal-message') },
-            request: { modal: document.getElementById('request-modal'), title: document.getElementById('request-modal-title'), close: document.getElementById('close-request-modal-button'), form: document.getElementById('request-form'), text: document.getElementById('request-text'), msg: document.getElementById('request-modal-message') }
+            authButtonsContainer: document.getElementById('auth-buttons-container'),
+            logoutButton: document.getElementById('logout-button'),
+            reportsContainer: document.getElementById('reports-container'),
+            requestTableBody: document.getElementById('request-table-body'),
+            userDropdown: document.getElementById('user-dropdown'),
+            reportTableBody: document.getElementById('report-table-body'),
         };
 
-        let unsubscribe = { entries: null, requests: null };
-        let isIpAllowed = false;
-        let currentRequestDate = null;
+        let unsubscribe = { entries: null, requests: null, users: null };
         
-        async function verifyUserIp() {
-            try {
-                const response = await fetch('https://api.ipify.org?format=json');
-                const data = await response.json();
-                isIpAllowed = allowedIps.includes(data.ip);
-                ui.ipErrorMessage.classList.toggle('hidden', isIpAllowed);
-                if (!isIpAllowed) {
-                    ui.ipErrorMessage.textContent = "Acesso negado. O registo de ponto é permitido apenas em redes autorizadas.";
-                    [ui.clockInButton, ui.clockOutButton].forEach(b => b.disabled = true);
-                }
-            } catch (error) {
-                isIpAllowed = false;
-                ui.ipErrorMessage.textContent = "Não foi possível verificar a sua rede. O registo de ponto está desativado.";
-                ui.ipErrorMessage.classList.remove('hidden');
-                [ui.clockInButton, ui.clockOutButton].forEach(b => b.disabled = true);
-            }
-        }
-
         onAuthStateChanged(auth, async (user) => {
-            if (user && !user.isAnonymous) {
-                ui.loginScreen.style.display = 'none';
-                ui.appScreen.style.display = 'block';
-                await verifyUserIp();
+            if (user) {
                 const userDoc = await getDoc(doc(db, "users", user.uid));
-                ui.userNameSpan.textContent = userDoc.exists() ? userDoc.data().name : user.email;
-                listenToFirebase(user);
+                if (userDoc.exists() && userDoc.data().role) {
+                    const userRole = userDoc.data().role;
+                    if (userRole === 'admin' || userRole === 'gerente_geral' || userRole === 'gerente_nupap' || userRole === 'gerente_nudof') {
+                        ui.loginScreen.classList.add('hidden');
+                        ui.appScreen.classList.remove('hidden');
+                        ui.userNameSpan.textContent = userDoc.data().name;
+                        listenToFirebase(user, userRole, userDoc.data().team);
+                    } else {
+                        ui.loginError.textContent = "Acesso negado. Apenas administradores podem acessar esta página.";
+                        ui.loginScreen.classList.remove('hidden');
+                        ui.appScreen.classList.add('hidden');
+                        signOut(auth);
+                    }
+                } else {
+                    ui.loginError.textContent = "Perfil de usuário não encontrado ou incompleto.";
+                    ui.loginScreen.classList.remove('hidden');
+                    ui.appScreen.classList.add('hidden');
+                    signOut(auth);
+                }
             } else {
-                ui.loginScreen.style.display = 'block';
-                ui.appScreen.style.display = 'none';
+                ui.loginScreen.classList.remove('hidden');
+                ui.appScreen.classList.add('hidden');
                 if (unsubscribe.entries) unsubscribe.entries();
                 if (unsubscribe.requests) unsubscribe.requests();
+                if (unsubscribe.users) unsubscribe.users();
             }
         });
 
-        function listenToFirebase(user) {
-            if (!user) return;
-            const entriesPath = `/artifacts/${appId}/users/${user.uid}/time_entries`;
-            const requestsPath = `/artifacts/${appId}/requests`;
-            
-            const entriesQuery = query(collection(db, entriesPath));
-            const requestsQuery = query(collection(db, requestsPath), where("userId", "==", user.uid));
-            
-            if (unsubscribe.entries) unsubscribe.entries();
-            unsubscribe.entries = onSnapshot(entriesQuery, (snapshot) => {
-                const entries = snapshot.docs.map(d => ({ id: d.id, ...d.data() })).sort((a, b) => a.timestamp.toMillis() - b.timestamp.toMillis());
-                if (unsubscribe.requests) unsubscribe.requests();
-                unsubscribe.requests = onSnapshot(requestsQuery, (reqSnapshot) => {
-                    const requests = reqSnapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-                    renderAll(entries, requests);
+        function listenToFirebase(user, role, team) {
+            const usersRef = collection(db, 'users');
+            unsubscribe.users = onSnapshot(usersRef, (usersSnapshot) => {
+                const users = usersSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+                renderUserDropdown(users, role, team);
+                
+                const requestsRef = collection(db, `/artifacts/${appId}/requests`);
+                unsubscribe.requests = onSnapshot(requestsRef, (requestsSnapshot) => {
+                    const requests = requestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    renderRequestsTable(requests, users, role, team);
                 });
             });
         }
 
-        function renderAll(entries, requests) {
-            const todayEntries = entries.filter(e => new Date(e.timestamp.toDate()).toDateString() === new Date().toDateString());
-            if (isIpAllowed) updateButtonState(todayEntries);
-            calculateAndDisplayDailyBalance(todayEntries);
-            renderHistory(entries, requests);
-        }
-
-        function updateButtonState(entries) {
-            const lastEntry = entries[entries.length - 1];
-            ui.clockInButton.disabled = lastEntry && lastEntry.type === 'in';
-            ui.clockOutButton.disabled = !lastEntry || lastEntry.type === 'out';
-        }
-
-        function calculateAndDisplayDailyBalance(entries) {
-            let workedMs = 0;
-            for (let i = 0; i < entries.length - 1; i += 2) {
-                if (entries[i]?.type === 'in' && entries[i+1]?.type === 'out') {
-                    workedMs += entries[i+1].timestamp.toMillis() - entries[i].timestamp.toMillis();
-                }
-            }
-            ui.totalWorkedSpan.textContent = formatMilliseconds(workedMs);
-            if (entries.length % 2 !== 0 || entries.length === 0) {
-                ui.dailyBalanceSpan.textContent = '---';
-                ui.dailyBalanceSpan.className = 'text-lg sm:text-xl font-bold text-gray-800';
-                return;
-            }
-            const balanceMs = workedMs - (6 * 3600 * 1000);
-            const isTolerated = Math.abs(balanceMs) <= (15 * 60 * 1000);
-            ui.dailyBalanceSpan.textContent = isTolerated ? '00:00:00' : formatMilliseconds(balanceMs, true);
-            ui.dailyBalanceSpan.className = `text-lg sm:text-xl font-bold ${isTolerated ? 'text-gray-800' : balanceMs > 0 ? 'text-green-600' : 'text-red-600'}`;
-        }
-        
-        function renderHistory(entries, requests) {
-            ui.historyTableBody.innerHTML = '';
-            ui.noHistoryMessage.classList.toggle('hidden', entries.length > 0);
-            if(entries.length === 0) { ui.accumulatedBalanceSpan.textContent = '00:00:00'; return; }
-
-            let totalBalanceMs = 0;
-            const entriesByDay = entries.reduce((acc, entry) => {
-                const date = entry.timestamp.toDate().toLocaleDateString('pt-BR');
-                if (!acc[date]) acc[date] = [];
-                acc[date].push(entry);
-                return acc;
-            }, {});
-
-            const sortedDays = Object.keys(entriesByDay).sort((a, b) => new Date(b.split('/').reverse().join('-')) - new Date(a.split('/').reverse().join('-')));
+        function renderUserDropdown(users, role, team) {
+            ui.userDropdown.innerHTML = '';
+            const allOption = document.createElement('option');
+            allOption.value = 'all';
+            allOption.textContent = 'Todos os Funcionários';
+            ui.userDropdown.appendChild(allOption);
             
-            sortedDays.forEach(date => {
-                const dayEntries = entriesByDay[date];
-                const ins = dayEntries.filter(e => e.type === 'in').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR'));
-                const outs = dayEntries.filter(e => e.type === 'out').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR'));
-                let dailyWorkedMs = 0;
-                for (let i = 0; i < dayEntries.length - 1; i += 2) {
-                    if (dayEntries[i].type === 'in' && dayEntries[i+1].type === 'out') {
-                        dailyWorkedMs += dayEntries[i+1].timestamp.toMillis() - dayEntries[i].timestamp.toMillis();
-                    }
+            users.filter(u => u.role === 'employee').forEach(user => {
+                if (role === 'gerente_geral' || (role === 'gerente_nupap' && user.team === 'nupap') || (role === 'gerente_nudof' && user.team === 'nudof')) {
+                    const option = document.createElement('option');
+                    option.value = user.id;
+                    option.textContent = user.name;
+                    ui.userDropdown.appendChild(option);
                 }
-                
-                let balanceText = '---', balanceClass = 'text-gray-700';
-                if (dayEntries.length % 2 === 0 && dayEntries.length > 0) {
-                    const dailyBalanceMs = dailyWorkedMs - (6 * 3600 * 1000);
-                    if (Math.abs(dailyBalanceMs) > (15 * 60 * 1000)) {
-                        totalBalanceMs += dailyBalanceMs;
-                    }
-                    balanceText = Math.abs(dailyBalanceMs) <= (15 * 60 * 1000) ? '00:00:00' : formatMilliseconds(dailyBalanceMs, true);
-                    balanceClass = dailyBalanceMs > 0 ? 'text-green-600' : 'text-red-600';
-                }
-
-                const requestForDay = requests.find(r => r.date === date);
-                let requestIcon = `<svg class="w-6 h-6 text-gray-400 hover:text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>`;
-                let statusText = '', statusColor = '';
-                if (requestForDay) {
-                    if(requestForDay.status === 'approved') { statusText = 'Aprovada'; statusColor = 'text-green-500'; }
-                    else if (requestForDay.status === 'declined') { statusText = 'Recusada'; statusColor = 'text-red-500'; }
-                    else { statusText = 'Pendente'; statusColor = 'text-yellow-500'; }
-                    requestIcon = `<svg class="w-6 h-6 ${statusColor}" fill="currentColor" viewBox="0 0 20 20"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"></path><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"></path></svg>`;
-                }
-                
-                const row = document.createElement('tr');
-                row.innerHTML = `<td class="px-6 py-4">${date}</td><td class="px-6 py-4">${ins.join(', ')}</td><td class="px-6 py-4">${outs.join(', ')}</td><td class="px-6 py-4 font-medium ${balanceClass}">${balanceText}</td><td class="px-6 py-4"><div class="flex items-center gap-2"><button class="request-btn cursor-pointer" data-date="${date}">${requestIcon}</button><span class="text-xs font-medium ${statusColor}">${statusText}</span></div></td>`;
-                row.querySelector('.request-btn').addEventListener('click', () => openRequestModal(date));
-                ui.historyTableBody.appendChild(row);
             });
+        }
 
-            ui.accumulatedBalanceSpan.textContent = formatMilliseconds(totalBalanceMs, true);
-            ui.accumulatedBalanceSpan.className = `text-3xl font-bold ${totalBalanceMs >= 0 ? 'text-green-600' : 'text-red-600'}`;
-        }
-        
-        function openRequestModal(date) {
-            currentRequestDate = date;
-            ui.request.title.textContent = `Enviar Solicitação para ${date}`;
-            ui.request.text.value = '';
-            ui.request.msg.textContent = '';
-            ui.request.modal.style.display = 'flex';
-        }
-        
-        async function handleRequestSubmit(e) {
-            e.preventDefault();
+        ui.userDropdown.addEventListener('change', (e) => {
+            const selectedUserId = e.target.value;
             const user = auth.currentUser;
-            if (!user || !currentRequestDate) return;
-
-            const requestsRef = collection(db, `/artifacts/${appId}/requests`);
-            const q = query(requestsRef, where("userId", "==", user.uid), where("date", "==", currentRequestDate));
-            const existing = await getDocs(q);
-
-            if (!existing.empty) {
-                ui.request.msg.textContent = 'Já existe uma solicitação para esta data.';
-                ui.request.msg.className = 'text-sm mt-4 text-center text-red-600';
-                return;
+            const selectedUser = ui.userDropdown.options[ui.userDropdown.selectedIndex].textContent;
+            if (unsubscribe.entries) unsubscribe.entries();
+            if (selectedUserId === 'all') {
+                const entriesRef = collection(db, `/artifacts/${appId}/time_entries`);
+                const entriesQuery = query(entriesRef, orderBy("timestamp", "desc"));
+                unsubscribe.entries = onSnapshot(entriesQuery, (snapshot) => {
+                    const entries = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    renderReportTable(entries, 'all');
+                });
+            } else {
+                const entriesRef = collection(db, `/artifacts/${appId}/users/${selectedUserId}/time_entries`);
+                const entriesQuery = query(entriesRef, orderBy("timestamp", "desc"));
+                unsubscribe.entries = onSnapshot(entriesQuery, (snapshot) => {
+                    const entries = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    renderReportTable(entries, selectedUser);
+                });
             }
+        });
 
-            try {
-                await addDoc(requestsRef, { userId: user.uid, userName: ui.userNameSpan.textContent, date: currentRequestDate, text: ui.request.text.value, status: 'pending', createdAt: Timestamp.now() });
-                ui.request.msg.textContent = 'Solicitação enviada com sucesso!';
-                ui.request.msg.className = 'text-sm mt-4 text-center text-green-600';
-                setTimeout(() => ui.request.modal.style.display = 'none', 1500);
-            } catch (error) {
-                ui.request.msg.textContent = 'Erro ao enviar. Tente novamente.';
-                ui.request.msg.className = 'text-sm mt-4 text-center text-red-600';
-            }
+        function renderRequestsTable(requests, users, role, team) {
+            ui.requestTableBody.innerHTML = '';
+            requests.forEach(req => {
+                const user = users.find(u => u.id === req.userId);
+                if (!user) return;
+                
+                const isManagerForTeam = (role === 'gerente_nupap' && user.team === 'nupap') || (role === 'gerente_nudof' && user.team === 'nudof');
+                if (role === 'gerente_geral' || isManagerForTeam) {
+                    const statusClass = req.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : req.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="px-6 py-4">${req.userName}</td>
+                        <td class="px-6 py-4">${req.date}</td>
+                        <td class="px-6 py-4 text-xs font-semibold whitespace-nowrap"><span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">${req.status.toUpperCase()}</span></td>
+                        <td class="px-6 py-4">${req.text}</td>
+                        <td class="px-6 py-4 text-sm text-gray-500">
+                            ${req.status === 'pending' ? `<button class="approve-btn text-green-600 hover:text-green-900 mr-2">Aprovar</button> <button class="decline-btn text-red-600 hover:text-red-900">Recusar</button>` : '—'}
+                        </td>
+                    `;
+                    row.querySelector('.approve-btn')?.addEventListener('click', () => updateRequestStatus(req.id, 'approved'));
+                    row.querySelector('.decline-btn')?.addEventListener('click', () => updateRequestStatus(req.id, 'declined'));
+                    ui.requestTableBody.appendChild(row);
+                }
+            });
         }
-        
-        // --- Event Listeners ---
+
+        function updateRequestStatus(requestId, status) {
+            const requestDocRef = doc(db, `/artifacts/${appId}/requests`, requestId);
+            setDoc(requestDocRef, { status }, { merge: true });
+        }
+
         ui.loginForm.addEventListener('submit', async (e) => { e.preventDefault(); ui.loginError.textContent = ''; try { await signInWithEmailAndPassword(auth, ui.loginForm.email.value, ui.loginForm.password.value); } catch (error) { ui.loginError.textContent = "E-mail ou senha inválidos."; } });
         ui.logoutButton.addEventListener('click', () => signOut(auth));
-        ui.clockInButton.addEventListener('click', () => recordTime('in'));
-        ui.clockOutButton.addEventListener('click', () => recordTime('out'));
         ui.forgot.link.addEventListener('click', () => ui.forgot.modal.style.display = 'flex');
         ui.forgot.close.addEventListener('click', () => ui.forgot.modal.style.display = 'none');
         ui.request.close.addEventListener('click', () => ui.request.modal.style.display = 'none');
-        ui.request.form.addEventListener('submit', handleRequestSubmit);
         ui.forgot.form.addEventListener('submit', async (e) => { e.preventDefault(); ui.forgot.msg.textContent = "A enviar..."; try { await sendPasswordResetEmail(auth, ui.forgot.email.value); ui.forgot.msg.textContent = "Link enviado!"; ui.forgot.msg.className = 'text-sm mt-4 text-center text-green-600';} catch (error) { ui.forgot.msg.textContent = "Erro ao enviar e-mail."; ui.forgot.msg.className = 'text-sm mt-4 text-center text-red-600';}});
         window.onclick = (event) => { if (event.target == ui.forgot.modal) ui.forgot.modal.style.display = "none"; if (event.target == ui.request.modal) ui.request.modal.style.display = "none"; };
-        
-        updateClock();
-        function updateClock() {
-            const now = new Date();
-            ui.currentTimeSpan.textContent = now.toLocaleTimeString('pt-BR');
-            ui.headerDateSpan.textContent = now.toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-            setTimeout(updateClock, 1000);
-        }
-
-        function recordTime(type) { if (!isIpAllowed) return; const user = auth.currentUser; if (!user) return; const btn = type === 'in' ? ui.clockInButton : ui.clockOutButton; btn.disabled = true; addDoc(collection(db, `/artifacts/${appId}/users/${user.uid}/time_entries`), { type, timestamp: Timestamp.now(), userId: user.uid }).catch(() => btn.disabled = false); }
-        function formatMilliseconds(ms, neg = false) { const s = ms < 0 ? '-' : ''; if(neg) ms=Math.abs(ms); else if(ms<0) ms=0; const t = Math.floor(ms/1000); const h = Math.floor(t/3600); const m = Math.floor((t%3600)/60); const sec = t%60; return `${s}${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(sec).padStart(2,'0')}`; }
     </script>
 </body>
 </html>
