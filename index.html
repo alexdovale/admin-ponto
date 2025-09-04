@@ -80,7 +80,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, onAuthStateChanged, signOut, signInWithEmailAndPassword, setPersistence, browserSessionPersistence } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, getDocs, query, collectionGroup, setLogLevel, doc, writeBatch, Timestamp, updateDoc, addDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, getDocs, query, collectionGroup, setLogLevel, doc, writeBatch, Timestamp, updateDoc, addDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "AIzaSyBqWlyh2vo0I_gRWysG2NYdz0gvopRO3SI", authDomain: "sistema-ponto-v2.firebaseapp.com", projectId: "sistema-ponto-v2", storageBucket: "sistema-ponto-v2.firebasestorage.app", messagingSenderId: "582643132528", appId: "1:582643132528:web:2d489ae3c23786152a2cb5" };
         const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
@@ -97,7 +97,7 @@
             add: { modal: document.getElementById('add-record-modal'), form: document.getElementById('add-record-form'), cancel: document.getElementById('cancel-add-button'), error: document.getElementById('add-record-error'), userSelect: document.getElementById('add-record-user') }
         };
 
-        let allRecords = [], usersMap = {}, allRequests = [], currentDayEntries = [], currentRequest = null;
+        let allRecords = [], usersMap = {}, allRequests = [], currentDayEntries = [], currentRequest = null, adminProfile = null;
         
         onAuthStateChanged(auth, async (user) => { 
             const isLoggedIn = !!user;
@@ -111,21 +111,46 @@
         });
         
         async function loadAllData() {
-            ui.loading.textContent = "A carregar dados...";
+            ui.loading.textContent = "A verificar permissões...";
             try {
+                const adminSnap = await getDoc(doc(db, "admins", auth.currentUser.uid));
+                if (!adminSnap.exists()) throw new Error("Perfil de administrador não encontrado.");
+                
+                adminProfile = adminSnap.data();
+                const isSuperAdmin = adminProfile.role === 'superadmin';
+                const managedTeams = adminProfile.managesTeams || [];
+
+                ui.loading.textContent = "A carregar dados...";
                 const [usersSnap, recordsSnap, requestsSnap] = await Promise.all([
                     getDocs(collection(db, "users")),
                     getDocs(query(collectionGroup(db, 'time_entries'))),
                     getDocs(collection(db, `/artifacts/${appId}/requests`))
                 ]);
+
+                const allUsersData = {};
+                usersSnap.forEach(doc => allUsersData[doc.id] = { id: doc.id, ...doc.data() });
+
                 usersMap = {};
-                usersSnap.forEach(doc => usersMap[doc.id] = doc.data().name || 'Nome não encontrado');
-                allRecords = recordsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                allRequests = requestsSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                if (isSuperAdmin) {
+                    usersMap = allUsersData;
+                } else {
+                    Object.keys(allUsersData).forEach(uid => {
+                        if (managedTeams.includes(allUsersData[uid].team)) {
+                            usersMap[uid] = allUsersData[uid];
+                        }
+                    });
+                }
+                
+                const allowedUserIds = Object.keys(usersMap);
+                allRecords = recordsSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => allowedUserIds.includes(r.userId));
+                allRequests = requestsSnap.docs.map(d => ({ id: d.id, ...d.data() })).filter(r => allowedUserIds.includes(r.userId));
+                
                 populateUserFilter();
                 renderTable();
             } catch (e) {
-                ui.loading.textContent = "Erro ao carregar dados. Verifique as regras de segurança.";
+                console.error("Erro:", e);
+                ui.loading.textContent = `Erro: ${e.message}. Verifique as regras e a estrutura de dados.`;
+                if(e.message.includes("administrador")) await signOut(auth);
             }
         }
         
@@ -155,7 +180,7 @@
                     balanceText = formatMilliseconds(balanceMs, true);
                     balanceClass = balanceMs >= 0 ? 'text-green-600' : 'text-red-600';
                     const monthKey = `${date.getMonth()+1}/${date.getFullYear()}`;
-                    (monthlyBalances[monthKey] ||= {})[userId] ||= { name: usersMap[userId] || userId, balanceMs: 0 };
+                    (monthlyBalances[monthKey] ||= {})[userId] ||= { name: usersMap[userId].name || userId, balanceMs: 0 };
                     monthlyBalances[monthKey][userId].balanceMs += balanceMs;
                 }
                 
@@ -167,7 +192,7 @@
                 }
 
                 const row = ui.tableBody.insertRow();
-                row.innerHTML = `<td class="px-6 py-4">${usersMap[userId]}</td><td class="px-6 py-4">${dateStr}</td><td class="px-6 py-4">${dayEntries.filter(e=>e.type==='in').map(e=>e.timestamp.toDate().toLocaleTimeString('pt-BR')).join(', ')}</td><td class="px-6 py-4">${dayEntries.filter(e=>e.type==='out').map(e=>e.timestamp.toDate().toLocaleTimeString('pt-BR')).join(', ')}</td><td class="px-6 py-4 font-medium ${balanceClass}">${balanceText}</td><td class="px-6 py-4"><button class="edit-btn text-indigo-600 hover:text-indigo-900">Editar</button> ${requestIcon}</td>`;
+                row.innerHTML = `<td class="px-6 py-4">${usersMap[userId].name}</td><td class="px-6 py-4">${dateStr}</td><td class="px-6 py-4">${dayEntries.filter(e=>e.type==='in').map(e=>e.timestamp.toDate().toLocaleTimeString('pt-BR')).join(', ')}</td><td class="px-6 py-4">${dayEntries.filter(e=>e.type==='out').map(e=>e.timestamp.toDate().toLocaleTimeString('pt-BR')).join(', ')}</td><td class="px-6 py-4 font-medium ${balanceClass}">${balanceText}</td><td class="px-6 py-4"><button class="edit-btn text-indigo-600 hover:text-indigo-900">Editar</button> ${requestIcon}</td>`;
                 row.querySelector('.edit-btn').addEventListener('click', () => openEditModal(dayEntries));
                 if(request) row.querySelector('.request-view-btn').addEventListener('click', () => openRequestViewModal(request));
             });
@@ -196,7 +221,7 @@
             currentDayEntries = dayEntries;
             const originalDate = dayEntries[0].timestamp.toDate();
             ui.edit.error.textContent = '';
-            ui.edit.title.textContent = `Editar Registos de ${usersMap[dayEntries[0].userId]}`;
+            ui.edit.title.textContent = `Editar Registos de ${usersMap[dayEntries[0].userId].name}`;
             ui.edit.dateInput.value = originalDate.toISOString().split('T')[0];
             ui.edit.fields.innerHTML = dayEntries.map((entry, i) => `
                 <div class="grid grid-cols-4 items-center gap-2">
@@ -284,7 +309,7 @@
         ui.add.cancel.addEventListener('click', () => ui.add.modal.style.display = 'none');
         ui.add.form.addEventListener('submit', handleAddRecord);
         
-        function populateUserFilter() { ui.userFilter.innerHTML = '<option value="all">Todos</option>'; Object.keys(usersMap).sort((a,b) => usersMap[a].localeCompare(usersMap[b])).forEach(uid => { const o = document.createElement('option'); o.value = uid; o.textContent = usersMap[uid]; ui.userFilter.appendChild(o); }); }
+        function populateUserFilter() { ui.userFilter.innerHTML = '<option value="all">Todos</option>'; Object.keys(usersMap).sort((a,b) => usersMap[a].name.localeCompare(usersMap[b].name)).forEach(uid => { const o = document.createElement('option'); o.value = uid; o.textContent = usersMap[uid].name; ui.userFilter.appendChild(o); }); }
         function formatMilliseconds(ms, neg = false) { const s = ms < 0 ? '-' : ''; if(neg) ms=Math.abs(ms); else if(ms<0)ms=0; const t=Math.floor(ms/1000), h=Math.floor(t/3600), m=Math.floor((t%3600)/60); return `${s}${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`; }
     </script>
 </body>
