@@ -484,7 +484,7 @@
 
         let recordToDelete = null;
 
-        let entryToAdd = null; // Novo objeto para armazenar dados da nova batida
+        let entryToAdd = null; 
 
 
 
@@ -698,6 +698,8 @@
 
             const monthName = new Date(year, month - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
 
+            const today = new Date();
+
             
 
             ui.reportTitle.textContent = `Relatório para ${userName} - ${monthName}`;
@@ -790,23 +792,21 @@
 
                 const isWeekend = dayIndex === 0 || dayIndex === 6;
 
+                
 
+                let ins = '---';
 
-                const dayEntries = entriesByDay[dateString] || [];
-
-                const justification = approvedRequests[dateString];
-
-
-
-                let ins = dayEntries.length > 0 ? dayEntries.filter(e => e.type === 'in').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).join(', ') : '---';
-
-                let outs = dayEntries.length > 0 ? dayEntries.filter(e => e.type === 'out').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).join(', ') : '---';
+                let outs = '---';
 
                 let dailyBalanceText = '---';
 
                 let dailyBalanceClass = 'text-gray-700';
 
                 let actionsHtml = `<button class="add-entry-btn text-blue-600 hover:text-blue-900" data-date="${currentDate.toISOString()}" data-user-id="${userId}">Adicionar Batida</button>`;
+
+
+
+                const isFutureDay = currentDate > today && currentDate.getMonth() === today.getMonth() && currentDate.getFullYear() === today.getFullYear();
 
 
 
@@ -818,55 +818,77 @@
 
                     actionsHtml = '---';
 
-                } else if (justification) {
+                } else if (isFutureDay) {
 
-                    dailyBalanceText = justification;
-
-                    dailyBalanceClass = 'text-blue-600';
+                    dailyBalanceText = '---';
 
                     actionsHtml = '---';
 
-                } else if (dayEntries.length === 0) {
-
-                    dailyBalanceText = 'Falta';
-
-                    dailyBalanceClass = 'text-red-600 font-bold';
-
-                    totalMonthlyBalanceMs -= (6 * 3600 * 1000); 
-
-                } else if (dayEntries.length % 2 !== 0) {
-
-                    dailyBalanceText = 'Batida Ímpar';
-
-                    dailyBalanceClass = 'text-orange-500 font-bold';
-
                 } else {
 
-                    let dailyWorkedMs = 0;
+                    const dayEntries = entriesByDay[dateString] || [];
 
-                    const sortedEntries = dayEntries.sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
+                    const justification = approvedRequests[dateString];
 
-                    for (let i = 0; i < sortedEntries.length; i += 2) {
 
-                        if (sortedEntries[i].type === 'in' && sortedEntries[i+1] && sortedEntries[i+1].type === 'out') {
 
-                            dailyWorkedMs += sortedEntries[i+1].timestamp.toMillis() - sortedEntries[i].timestamp.toMillis();
+                    ins = dayEntries.length > 0 ? dayEntries.filter(e => e.type === 'in').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).join(', ') : '---';
+
+                    outs = dayEntries.length > 0 ? dayEntries.filter(e => e.type === 'out').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).join(', ') : '---';
+
+
+
+                    if (justification) {
+
+                        dailyBalanceText = justification;
+
+                        dailyBalanceClass = 'text-blue-600';
+
+                        actionsHtml = '---';
+
+                    } else if (dayEntries.length === 0) {
+
+                        dailyBalanceText = 'Falta';
+
+                        dailyBalanceClass = 'text-red-600 font-bold';
+
+                        totalMonthlyBalanceMs -= (6 * 3600 * 1000); 
+
+                    } else if (dayEntries.length % 2 !== 0) {
+
+                        dailyBalanceText = 'Batida Ímpar';
+
+                        dailyBalanceClass = 'text-orange-500 font-bold';
+
+                    } else {
+
+                        let dailyWorkedMs = 0;
+
+                        const sortedEntries = dayEntries.sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
+
+                        for (let i = 0; i < sortedEntries.length; i += 2) {
+
+                            if (sortedEntries[i].type === 'in' && sortedEntries[i+1] && sortedEntries[i+1].type === 'out') {
+
+                                dailyWorkedMs += sortedEntries[i+1].timestamp.toMillis() - sortedEntries[i].timestamp.toMillis();
+
+                            }
 
                         }
 
+                        const dailyBalanceMs = dailyWorkedMs - (6 * 3600 * 1000);
+
+                        if (Math.abs(dailyBalanceMs) > (15 * 60 * 1000)) {
+
+                            totalMonthlyBalanceMs += dailyBalanceMs;
+
+                        }
+
+                        dailyBalanceText = Math.abs(dailyBalanceMs) <= (15 * 60 * 1000) ? '00:00' : formatMilliseconds(dailyBalanceMs, true);
+
+                        dailyBalanceClass = dailyBalanceMs >= 0 ? 'text-green-600' : 'text-red-600';
+
                     }
-
-                    const dailyBalanceMs = dailyWorkedMs - (6 * 3600 * 1000);
-
-                    if (Math.abs(dailyBalanceMs) > (15 * 60 * 1000)) {
-
-                        totalMonthlyBalanceMs += dailyBalanceMs;
-
-                    }
-
-                    dailyBalanceText = Math.abs(dailyBalanceMs) <= (15 * 60 * 1000) ? '00:00' : formatMilliseconds(dailyBalanceMs, true);
-
-                    dailyBalanceClass = dailyBalanceMs >= 0 ? 'text-green-600' : 'text-red-600';
 
                 }
 
