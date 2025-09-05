@@ -354,8 +354,15 @@
 
             let totalMonthlyBalanceMs = 0;
 
-            Object.keys(entriesByDay).sort((a, b) => new Date(a.split('/').reverse().join('-')) - new Date(b.split('/').reverse().join('-'))).forEach(date => {
-                const currentDate = new Date(date.split('/').reverse().join('-'));
+            Object.keys(entriesByDay).sort((a, b) => {
+                const partsA = a.split('/');
+                const dateA = new Date(partsA[2], partsA[1] - 1, partsA[0]);
+                const partsB = b.split('/');
+                const dateB = new Date(partsB[2], partsB[1] - 1, partsB[0]);
+                return dateA - dateB;
+            }).forEach(date => {
+                const parts = date.split('/');
+                const currentDate = new Date(parts[2], parts[1] - 1, parts[0]);
                 const dayOfWeek = currentDate.toLocaleDateString('pt-BR', { weekday: 'short' });
                 const dayIndex = currentDate.getDay();
                 const isWeekend = dayIndex === 0 || dayIndex === 6;
@@ -456,9 +463,9 @@
             ui.reportTitle.textContent = `Histórico Completo para ${allUsers.find(u => u.id === userId)?.name}`;
 
             if (entries.length === 0) {
-                 ui.noReportMessage.classList.remove('hidden');
-                 ui.noReportMessage.textContent = 'Nenhum registro encontrado para este funcionário.';
-                 return;
+               ui.noReportMessage.classList.remove('hidden');
+               ui.noReportMessage.textContent = 'Nenhum registro encontrado para este funcionário.';
+               return;
             }
             
             entries.forEach(entry => {
