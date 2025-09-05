@@ -317,18 +317,11 @@
                 return entryDate.getFullYear() === year && (entryDate.getMonth() + 1) === month;
             });
 
-            if (filteredEntries.length === 0) {
-                ui.reportTitle.textContent = `Relatório para ${allUsers.find(u => u.id === userId)?.name}`;
-                ui.noReportMessage.classList.remove('hidden');
-                ui.noReportMessage.textContent = "Nenhum registro encontrado para o mês selecionado.";
-                ui.occurrenceSection.classList.remove('hidden');
-                return;
-            }
-
-            renderMonthlyReportTable(filteredEntries, userId, month, year);
+            // A lógica de renderização agora está assíncrona
+            await renderMonthlyReportTable(filteredEntries, userId, month, year);
         }
 
-        function renderMonthlyReportTable(entries, userId, month, year) {
+        async function renderMonthlyReportTable(entries, userId, month, year) {
             const userName = allUsers.find(u => u.id === userId)?.name;
             const monthName = new Date(year, month - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
             
@@ -345,6 +338,22 @@
             `;
             ui.noReportMessage.classList.add('hidden');
             
+            // Buscar solicitações aprovadas para o mês e usuário selecionados
+            const requestsRef = collection(db, `/artifacts/${appId}/requests`);
+            const q = query(requestsRef, where("userId", "==", userId), where("status", "==", "approved"));
+            const requestsSnapshot = await getDocs(q);
+            const approvedRequests = {};
+            requestsSnapshot.docs.forEach(doc => {
+                const req = doc.data();
+                if (req.date) {
+                    const [reqDay, reqMonth, reqYear] = req.date.split('/');
+                    if (parseInt(reqYear, 10) === year && parseInt(reqMonth, 10) === month) {
+                        const lookupDate = new Date(parseInt(reqYear, 10), parseInt(reqMonth, 10) - 1, parseInt(reqDay, 10)).toLocaleDateString('pt-BR');
+                        approvedRequests[lookupDate] = req.text || 'Abonado';
+                    }
+                }
+            });
+
             const entriesByDay = entries.reduce((acc, entry) => {
                 const date = entry.timestamp.toDate().toLocaleDateString('pt-BR');
                 if (!acc[date]) acc[date] = [];
@@ -353,50 +362,60 @@
             }, {});
 
             let totalMonthlyBalanceMs = 0;
+            const daysInMonth = new Date(year, month, 0).getDate();
 
-            Object.keys(entriesByDay).sort((a, b) => {
-                const partsA = a.split('/');
-                const dateA = new Date(partsA[2], partsA[1] - 1, partsA[0]);
-                const partsB = b.split('/');
-                const dateB = new Date(partsB[2], partsB[1] - 1, partsB[0]);
-                return dateA - dateB;
-            }).forEach(date => {
-                const parts = date.split('/');
-                const currentDate = new Date(parts[2], parts[1] - 1, parts[0]);
+            for (let day = 1; day <= daysInMonth; day++) {
+                const currentDate = new Date(year, month - 1, day);
+                const dateString = currentDate.toLocaleDateString('pt-BR');
                 const dayOfWeek = currentDate.toLocaleDateString('pt-BR', { weekday: 'short' });
                 const dayIndex = currentDate.getDay();
                 const isWeekend = dayIndex === 0 || dayIndex === 6;
 
-                const dayEntries = entriesByDay[date];
-                const ins = dayEntries.filter(e => e.type === 'in').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).join(', ');
-                const outs = dayEntries.filter(e => e.type === 'out').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).join(', ');
-                
-                let dailyWorkedMs = 0;
-                const sortedEntries = dayEntries.sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
-                for (let i = 0; i < sortedEntries.length - 1; i += 2) {
-                    if (sortedEntries[i].type === 'in' && sortedEntries[i+1] && sortedEntries[i+1].type === 'out') {
-                        dailyWorkedMs += sortedEntries[i+1].timestamp.toMillis() - sortedEntries[i].timestamp.toMillis();
-                    }
-                }
+                const dayEntries = entriesByDay[dateString] || [];
+                const justification = approvedRequests[dateString];
 
-                let dailyBalanceText = '---', dailyBalanceClass = 'text-gray-700';
-                
+                let ins = dayEntries.length > 0 ? dayEntries.filter(e => e.type === 'in').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).join(', ') : '---';
+                let outs = dayEntries.length > 0 ? dayEntries.filter(e => e.type === 'out').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).join(', ') : '---';
+                let dailyBalanceText = '---';
+                let dailyBalanceClass = 'text-gray-700';
+
                 if (isWeekend) {
                     dailyBalanceText = 'Fim de Semana';
                     dailyBalanceClass = 'text-gray-500 italic';
-                } else if (dayEntries.length % 2 === 0 && dayEntries.length > 0) {
+                } else if (justification) {
+                    dailyBalanceText = justification;
+                    dailyBalanceClass = 'text-blue-600';
+                    // Saldo do dia é zerado pois a falta/saída foi justificada
+                } else if (dayEntries.length === 0) {
+                    dailyBalanceText = 'Falta';
+                    dailyBalanceClass = 'text-red-600 font-bold';
+                    totalMonthlyBalanceMs -= (6 * 3600 * 1000); // Deduz 6 horas
+                } else if (dayEntries.length % 2 !== 0) {
+                    dailyBalanceText = 'Batida Ímpar';
+                    dailyBalanceClass = 'text-orange-500 font-bold';
+                    // Não calcula saldo para dias com erro de batida
+                } else {
+                    let dailyWorkedMs = 0;
+                    const sortedEntries = dayEntries.sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
+                    for (let i = 0; i < sortedEntries.length; i += 2) {
+                        if (sortedEntries[i].type === 'in' && sortedEntries[i+1] && sortedEntries[i+1].type === 'out') {
+                            dailyWorkedMs += sortedEntries[i+1].timestamp.toMillis() - sortedEntries[i].timestamp.toMillis();
+                        }
+                    }
                     const dailyBalanceMs = dailyWorkedMs - (6 * 3600 * 1000);
+                    // Adiciona ao saldo mensal apenas se ultrapassar a tolerância de 15 min
                     if (Math.abs(dailyBalanceMs) > (15 * 60 * 1000)) {
                         totalMonthlyBalanceMs += dailyBalanceMs;
                     }
+                    // Mostra 00:00 se estiver dentro da tolerância
                     dailyBalanceText = Math.abs(dailyBalanceMs) <= (15 * 60 * 1000) ? '00:00' : formatMilliseconds(dailyBalanceMs, true);
                     dailyBalanceClass = dailyBalanceMs >= 0 ? 'text-green-600' : 'text-red-600';
                 }
 
                 const row = document.createElement('tr');
-                row.innerHTML = `<td class="px-6 py-4">${date}</td><td class="px-6 py-4 capitalize">${dayOfWeek.replace('.','')}</td><td class="px-6 py-4">${ins}</td><td class="px-6 py-4">${outs}</td><td class="px-6 py-4 font-medium ${dailyBalanceClass}">${dailyBalanceText}</td>`;
+                row.innerHTML = `<td class="px-6 py-4">${dateString}</td><td class="px-6 py-4 capitalize">${dayOfWeek.replace('.','')}</td><td class="px-6 py-4">${ins}</td><td class="px-6 py-4">${outs}</td><td class="px-6 py-4 font-medium ${dailyBalanceClass}">${dailyBalanceText}</td>`;
                 ui.reportTableBody.appendChild(row);
-            });
+            }
 
             ui.monthlyBalance.textContent = `Saldo total do mês: ${formatMilliseconds(totalMonthlyBalanceMs, true)}`;
             ui.monthlyBalance.className = `mt-4 p-4 rounded-md font-bold text-center ${totalMonthlyBalanceMs >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
