@@ -337,6 +337,7 @@
             ui.reportTableHead.innerHTML = `
                 <tr>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
+                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dia da Semana</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Entradas</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saídas</th>
                     <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saldo do Dia</th>
@@ -354,6 +355,11 @@
             let totalMonthlyBalanceMs = 0;
 
             Object.keys(entriesByDay).sort((a, b) => new Date(a.split('/').reverse().join('-')) - new Date(b.split('/').reverse().join('-'))).forEach(date => {
+                const currentDate = new Date(date.split('/').reverse().join('-'));
+                const dayOfWeek = currentDate.toLocaleDateString('pt-BR', { weekday: 'short' });
+                const dayIndex = currentDate.getDay();
+                const isWeekend = dayIndex === 0 || dayIndex === 6;
+
                 const dayEntries = entriesByDay[date];
                 const ins = dayEntries.filter(e => e.type === 'in').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).join(', ');
                 const outs = dayEntries.filter(e => e.type === 'out').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).join(', ');
@@ -367,7 +373,11 @@
                 }
 
                 let dailyBalanceText = '---', dailyBalanceClass = 'text-gray-700';
-                if (dayEntries.length % 2 === 0 && dayEntries.length > 0) {
+                
+                if (isWeekend) {
+                    dailyBalanceText = 'Fim de Semana';
+                    dailyBalanceClass = 'text-gray-500 italic';
+                } else if (dayEntries.length % 2 === 0 && dayEntries.length > 0) {
                     const dailyBalanceMs = dailyWorkedMs - (6 * 3600 * 1000);
                     if (Math.abs(dailyBalanceMs) > (15 * 60 * 1000)) {
                         totalMonthlyBalanceMs += dailyBalanceMs;
@@ -377,7 +387,7 @@
                 }
 
                 const row = document.createElement('tr');
-                row.innerHTML = `<td class="px-6 py-4">${date}</td><td class="px-6 py-4">${ins}</td><td class="px-6 py-4">${outs}</td><td class="px-6 py-4 font-medium ${dailyBalanceClass}">${dailyBalanceText}</td>`;
+                row.innerHTML = `<td class="px-6 py-4">${date}</td><td class="px-6 py-4 capitalize">${dayOfWeek.replace('.','')}</td><td class="px-6 py-4">${ins}</td><td class="px-6 py-4">${outs}</td><td class="px-6 py-4 font-medium ${dailyBalanceClass}">${dailyBalanceText}</td>`;
                 ui.reportTableBody.appendChild(row);
             });
 
@@ -649,7 +659,7 @@
             doc.setFontSize(12);
             doc.text(`Período: ${monthName}`, 14, 30);
 
-            const head = [['Data', 'Entradas', 'Saídas', 'Saldo do Dia']];
+            const head = [['Data', 'Dia da Semana', 'Entradas', 'Saídas', 'Saldo do Dia']];
             const body = [];
             ui.reportTableBody.querySelectorAll('tr').forEach(row => {
                 const rowData = [];
@@ -747,4 +757,3 @@
     </script>
 </body>
 </html>
-
