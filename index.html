@@ -944,26 +944,37 @@
                 } else {
                     const dayEntries = entriesByDay[dateString];
                     const isJustified = justifiedDates.has(dateString);
+
+                    if (dayEntries && dayEntries.length > 0) {
+                        const sortedEntries = dayEntries.sort((a, b) => a.timestamp.toMillis() - b.timestamp.toMillis());
+                        ins = sortedEntries.filter(e => e.type === 'in').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).join(', ');
+                        outs = sortedEntries.filter(e => e.type === 'out').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).join(', ');
+                    }
+
                     if (isJustified) {
                         const req = approvedRequests.find(r => r.date === dateString);
-                        dailyBalanceText = req ? req.text : 'Justificado'; 
+                        dailyBalanceText = req ? req.text : 'Justificado';
                     } else if (!dayEntries) {
-                        totalBalanceMs -= (6 * 3600 * 1000); absenceDays++; dailyBalanceText = 'Falta';
+                        totalBalanceMs -= (6 * 3600 * 1000);
+                        absenceDays++;
+                        dailyBalanceText = 'Falta';
                     } else if (dayEntries.length % 2 === 0) {
                         let dailyWorkedMs = 0;
-                        const sortedEntries = dayEntries.sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
+                        const sortedEntries = dayEntries.sort((a, b) => a.timestamp.toMillis() - b.timestamp.toMillis());
                         for (let i = 0; i < sortedEntries.length; i += 2) {
-                            if (sortedEntries[i].type === 'in' && sortedEntries[i+1] && sortedEntries[i+1].type === 'out') {
-                                dailyWorkedMs += sortedEntries[i+1].timestamp.toMillis() - sortedEntries[i].timestamp.toMillis();
+                            if (sortedEntries[i].type === 'in' && sortedEntries[i + 1] && sortedEntries[i + 1].type === 'out') {
+                                dailyWorkedMs += sortedEntries[i + 1].timestamp.toMillis() - sortedEntries[i].timestamp.toMillis();
                             }
                         }
                         totalWorkedMs += dailyWorkedMs;
                         const dailyBalanceMs = dailyWorkedMs - (6 * 3600 * 1000);
-                        if (Math.abs(dailyBalanceMs) > (15 * 60 * 1000)) { totalBalanceMs += dailyBalanceMs; }
+                        if (Math.abs(dailyBalanceMs) > (15 * 60 * 1000)) {
+                            totalBalanceMs += dailyBalanceMs;
+                        }
                         dailyBalanceText = Math.abs(dailyBalanceMs) <= (15 * 60 * 1000) ? '00:00' : formatMilliseconds(dailyBalanceMs, true);
-                        ins = sortedEntries.filter(e => e.type === 'in').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).join(', ');
-                        outs = sortedEntries.filter(e => e.type === 'out').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).join(', ');
-                    } else { dailyBalanceText = 'Batida Ímpar'; }
+                    } else {
+                        dailyBalanceText = 'Batida Ímpar';
+                    }
                 }
                 detailedBody.push([dateString, dayOfWeek, ins, outs, dailyBalanceText]);
                 currentDate.setDate(currentDate.getDate() + 1);
@@ -1007,21 +1018,20 @@
             doc.text(`Dias de Falta (não justificados): ${reportData.absenceDays}`, 14, finalY + 8);
             doc.setFontSize(14); doc.setFont('helvetica', 'bold');
             doc.text(`Saldo Final de Horas: ${reportData.finalBalance}`, 14, finalY + 18);
-            finalY += 30;
+            finalY = finalY + 28;
 
             if (reportData.approvedRequests && reportData.approvedRequests.length > 0) {
                 doc.setFontSize(12);
                 doc.setFont('helvetica', 'bold');
                 doc.text('Solicitações Autorizadas', 14, finalY);
-                finalY += 3;
-
+                
                 const requestsHead = [['Data', 'Motivo']];
                 const requestsBody = reportData.approvedRequests.map(req => [req.date, req.text]);
 
                 doc.autoTable({
                     head: requestsHead,
                     body: requestsBody,
-                    startY: finalY,
+                    startY: finalY + 5,
                     theme: 'grid',
                     headStyles: { fillColor: [44, 62, 80] },
                 });
@@ -1030,10 +1040,15 @@
 
             doc.setFontSize(12); doc.setFont('helvetica', 'bold');
             doc.text('Registros de Ponto Detalhados', 14, finalY);
-            finalY += 3;
             
             const head = [['Data', 'Dia', 'Entradas', 'Saídas', 'Saldo']];
-            doc.autoTable({ head, body: reportData.detailedBody, startY: finalY, theme: 'striped', headStyles: { fillColor: [22, 160, 133] } });
+            doc.autoTable({ 
+                head, 
+                body: reportData.detailedBody, 
+                startY: finalY + 5,
+                theme: 'striped', 
+                headStyles: { fillColor: [22, 160, 133] } 
+            });
             
             doc.save(`relatorio_final_${reportData.userName.replace(/\s+/g, '_').toLowerCase()}.pdf`);
         }
