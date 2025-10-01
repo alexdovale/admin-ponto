@@ -909,7 +909,7 @@
             const allEntries = entriesSnapshot.docs.map(doc => doc.data());
 
             if (allEntries.length === 0) {
-                return { isDataAvailable: false, userName: user.name, detailedBody: [] };
+                return { isDataAvailable: false, userName: user.name, detailedBody: [], approvedRequests: [] };
             }
 
             const firstEntryDate = allEntries[0].timestamp.toDate();
@@ -927,7 +927,8 @@
             const requestsRef = collection(db, `/artifacts/${appId}/requests`);
             const q = query(requestsRef, where("userId", "==", userId), where("status", "==", "approved"));
             const requestsSnapshot = await getDocs(q);
-            const justifiedDates = new Set(requestsSnapshot.docs.map(doc => doc.data().date));
+            const approvedRequests = requestsSnapshot.docs.map(doc => doc.data());
+            const justifiedDates = new Set(approvedRequests.map(req => req.date));
             let currentDate = new Date(firstEntryDate); currentDate.setHours(0, 0, 0, 0);
             const finalDate = new Date(lastEntryDate); finalDate.setHours(0, 0, 0, 0);
 
@@ -942,9 +943,10 @@
                     dailyBalanceText = 'Fim de Semana';
                 } else {
                     const dayEntries = entriesByDay[dateString];
-                    const justification = justifiedDates.has(dateString);
-                    if (justification) {
-                        dailyBalanceText = 'Justificado'; 
+                    const isJustified = justifiedDates.has(dateString);
+                    if (isJustified) {
+                        const req = approvedRequests.find(r => r.date === dateString);
+                        dailyBalanceText = req ? req.text : 'Justificado'; 
                     } else if (!dayEntries) {
                         totalBalanceMs -= (6 * 3600 * 1000); absenceDays++; dailyBalanceText = 'Falta';
                     } else if (dayEntries.length % 2 === 0) {
@@ -966,7 +968,7 @@
                 detailedBody.push([dateString, dayOfWeek, ins, outs, dailyBalanceText]);
                 currentDate.setDate(currentDate.getDate() + 1);
             }
-            return { isDataAvailable: true, userName: user.name, contractPeriod, totalWorked: formatMilliseconds(totalWorkedMs), absenceDays, finalBalance: formatMilliseconds(totalBalanceMs, true), detailedBody };
+            return { isDataAvailable: true, userName: user.name, contractPeriod, totalWorked: formatMilliseconds(totalWorkedMs), absenceDays, finalBalance: formatMilliseconds(totalBalanceMs, true), detailedBody, approvedRequests };
         }
 
         async function generateFinalReport(userId) {
@@ -1006,6 +1008,25 @@
             doc.setFontSize(14); doc.setFont('helvetica', 'bold');
             doc.text(`Saldo Final de Horas: ${reportData.finalBalance}`, 14, finalY + 18);
             finalY += 30;
+
+            if (reportData.approvedRequests && reportData.approvedRequests.length > 0) {
+                doc.setFontSize(12);
+                doc.setFont('helvetica', 'bold');
+                doc.text('Solicitações Autorizadas', 14, finalY);
+                finalY += 3;
+
+                const requestsHead = [['Data', 'Motivo']];
+                const requestsBody = reportData.approvedRequests.map(req => [req.date, req.text]);
+
+                doc.autoTable({
+                    head: requestsHead,
+                    body: requestsBody,
+                    startY: finalY,
+                    theme: 'grid',
+                    headStyles: { fillColor: [44, 62, 80] },
+                });
+                finalY = doc.lastAutoTable.finalY + 10;
+            }
 
             doc.setFontSize(12); doc.setFont('helvetica', 'bold');
             doc.text('Registros de Ponto Detalhados', 14, finalY);
