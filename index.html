@@ -900,7 +900,7 @@
             try { await updateDoc(doc(db, 'users', userId), { status: newStatus }); } catch (error) { console.error("Error updating user status:", error); }
         }
         
-        async function calculateFinalReportData(userId) {
+        async function calculateFinalReportData(userId, isFinalizing = false) {
             const user = allUsers.find(u => u.id === userId);
             if (!user) return null;
 
@@ -913,7 +913,7 @@
             }
 
             const firstEntryDate = allEntries[0].timestamp.toDate();
-            const lastEntryDate = allEntries[allEntries.length - 1].timestamp.toDate();
+            const lastEntryDate = isFinalizing ? new Date() : allEntries[allEntries.length - 1].timestamp.toDate();
             const contractPeriod = `${firstEntryDate.toLocaleDateString('pt-BR')} a ${lastEntryDate.toLocaleDateString('pt-BR')}`;
             let totalBalanceMs = 0, absenceDays = 0, totalWorkedMs = 0;
             const detailedBody = [];
@@ -974,7 +974,7 @@
         async function generateFinalReport(userId) {
             ui.finalReportContent.innerHTML = `<div class="loader mx-auto"></div><p class="text-center mt-2">Calculando relatório...</p>`;
             ui.finalReportModal.style.display = 'flex';
-            const reportData = await calculateFinalReportData(userId);
+            const reportData = await calculateFinalReportData(userId, false);
             if (!reportData || !reportData.isDataAvailable) {
                  ui.finalReportContent.innerHTML = `<p><strong>Funcionário:</strong> ${reportData.userName}</p><p>Nenhum registro de ponto encontrado.</p>`;
                  ui.downloadFinalPdfBtn.classList.add('hidden');
@@ -990,7 +990,7 @@
         
         async function finalizeUserActivity(userId) {
             try {
-                const reportData = await calculateFinalReportData(userId);
+                const reportData = await calculateFinalReportData(userId, true);
                 if (reportData && reportData.isDataAvailable) { generateFinalReportPdf(reportData); }
                 await updateDoc(doc(db, 'users', userId), { status: 'inactive' });
             } catch (error) { console.error("Erro ao encerrar atividades:", error); }
