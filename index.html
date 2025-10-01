@@ -35,7 +35,7 @@
             <div class="bg-white p-8 rounded-lg shadow-md space-y-6">
                 <div class="flex flex-col items-center">
                     <img src="https://raw.githubusercontent.com/alexdovale/calculo-mensuracao-codoc/main/logo.png" alt="Logotipo da Empresa" class="mb-4 h-12">
-                    <hh2 class="text-center text-xl font-bold text-gray-700">COORDENAÇÃO DE GESTÃO DOCUMENTAL</h2>
+                    <h2 class="text-center text-xl font-bold text-gray-700">COORDENAÇÃO DE GESTÃO DOCUMENTAL</h2>
                     <p class="mt-2 text-center text-2xl font-extrabold text-gray-900">Painel do Administrador</p>
                 </div>
                 <form id="login-form" class="space-y-6" onsubmit="return false;">
@@ -97,6 +97,12 @@
 
                     <div class="mt-8">
                         <h3 class="text-lg font-medium">Solicitações de Funcionários</h3>
+                        <div class="my-4 flex flex-wrap gap-4 items-center p-4 bg-gray-50 rounded-lg">
+                            <select id="request-user-filter" class="p-2 border rounded-md flex-grow sm:flex-grow-0"></select>
+                            <input type="date" id="request-start-date-filter" class="p-2 border rounded-md flex-grow sm:flex-grow-0">
+                            <input type="date" id="request-end-date-filter" class="p-2 border rounded-md flex-grow sm:flex-grow-0">
+                            <input type="text" id="request-search-filter" class="p-2 border rounded-md flex-grow" placeholder="Pesquisar por texto...">
+                        </div>
                         <div class="mt-4 overflow-x-auto">
                             <table class="min-w-full divide-y divide-gray-200">
                                 <thead class="bg-gray-50">
@@ -112,6 +118,24 @@
                             </table>
                         </div>
                     </div>
+
+                    <div class="mt-8">
+                        <h3 class="text-lg font-medium">Gerenciamento de Usuários</h3>
+                        <div class="mt-4 overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="users-management-table-body" class="bg-white divide-y divide-gray-200">
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+
                 </div>
             </div>
         </div>
@@ -128,68 +152,25 @@
         </div>
     </footer>
     
-    <div id="forgot-password-modal" class="modal">
-        <div class="modal-content"><span id="close-forgot-modal-button" class="float-right text-2xl font-bold cursor-pointer">&times;</span><h3 class="text-lg font-medium mb-4">Redefinir Senha</h3><p class="text-sm text-gray-600 mb-4">Digite seu e-mail para receber um link de redefinição.</p><form id="forgot-password-form"><input id="forgot-email" type="email" required placeholder="Seu e-mail" class="w-full px-3 py-2 border rounded-md"><button type="submit" class="mt-4 w-full py-2 px-4 rounded-md text-white bg-green-600 hover:bg-green-700">Enviar Link</button></form><p id="modal-message" class="text-sm mt-4 text-center"></p></div>
-    </div>
-    <div id="delete-confirm-modal" class="modal">
-        <div class="modal-content">
-            <h3 id="delete-modal-title" class="text-lg font-medium mb-4">Confirmar Exclusão</h3>
-            <p id="delete-modal-text" class="text-sm text-gray-600 mb-4"></p>
-            <div class="flex justify-end gap-4">
-                <button id="cancel-delete-btn" class="py-2 px-4 rounded-md text-gray-700 bg-gray-200 hover:bg-gray-300">Cancelar</button>
-                <button id="confirm-delete-btn" class="py-2 px-4 rounded-md text-white bg-red-600 hover:bg-red-700">Apagar</button>
+    <div id="forgot-password-modal" class="modal"><div class="modal-content"><span id="close-forgot-modal-button" class="float-right text-2xl font-bold cursor-pointer">&times;</span><h3 class="text-lg font-medium mb-4">Redefinir Senha</h3><p class="text-sm text-gray-600 mb-4">Digite seu e-mail para receber um link de redefinição.</p><form id="forgot-password-form"><input id="forgot-email" type="email" required placeholder="Seu e-mail" class="w-full px-3 py-2 border rounded-md"><button type="submit" class="mt-4 w-full py-2 px-4 rounded-md text-white bg-green-600 hover:bg-green-700">Enviar Link</button></form><p id="modal-message" class="text-sm mt-4 text-center"></p></div></div>
+    <div id="delete-confirm-modal" class="modal"><div class="modal-content"><h3 id="delete-modal-title" class="text-lg font-medium mb-4">Confirmar Exclusão</h3><p id="delete-modal-text" class="text-sm text-gray-600 mb-4"></p><div class="flex justify-end gap-4"><button id="cancel-delete-btn" class="py-2 px-4 rounded-md text-gray-700 bg-gray-200 hover:bg-gray-300">Cancelar</button><button id="confirm-delete-btn" class="py-2 px-4 rounded-md text-white bg-red-600 hover:bg-red-700">Apagar</button></div></div></div>
+    <div id="edit-modal" class="modal"><div class="modal-content"><h3 class="text-lg font-medium mb-4">Editar Registro de Ponto</h3><div class="mb-4"><label for="edit-time-input" class="block text-sm font-medium text-gray-700 mb-1">Horário:</label><input type="time" id="edit-time-input" class="w-full px-3 py-2 border rounded-md"></div><div class="flex justify-end gap-4"><button id="cancel-edit-btn" class="py-2 px-4 rounded-md text-gray-700 bg-gray-200 hover:bg-gray-300">Cancelar</button><button id="save-edit-btn" class="py-2 px-4 rounded-md text-white bg-green-600 hover:bg-green-700">Salvar</button></div></div></div>
+    <div id="add-entry-modal" class="modal"><div class="modal-content"><h3 class="text-lg font-medium mb-4">Adicionar/Editar Batidas do Dia</h3><p id="add-entry-date" class="text-sm font-bold mb-4 text-gray-700"></p><div class="grid grid-cols-2 gap-4"><div><label for="add-entry-in-1" class="block text-sm font-medium text-gray-700 mb-1">Entrada:</label><input type="time" id="add-entry-in-1" class="w-full px-3 py-2 border rounded-md"></div><div><label for="add-entry-out-1" class="block text-sm font-medium text-gray-700 mb-1">Saída:</label><input type="time" id="add-entry-out-1" class="w-full px-3 py-2 border rounded-md"></div></div><p id="add-entry-message" class="text-sm mt-4 text-center"></p><div class="flex justify-end gap-4 mt-6"><button id="cancel-add-btn" class="py-2 px-4 rounded-md text-gray-700 bg-gray-200 hover:bg-gray-300">Cancelar</button><button id="save-add-btn" class="py-2 px-4 rounded-md text-white bg-green-600 hover:bg-green-700">Salvar</button></div></div></div>
+    <div id="justify-modal" class="modal"><div class="modal-content"><h3 class="text-lg font-medium mb-4">Justificar/Abonar Dia</h3><p id="justify-date" class="text-sm font-bold mb-4 text-gray-700"></p><div><label for="justify-reason" class="block text-sm font-medium text-gray-700 mb-1">Motivo:</label><input type="text" id="justify-reason" class="w-full px-3 py-2 border rounded-md" placeholder="Ex: Feriado, Atestado Médico..."></div><p id="justify-message" class="text-sm mt-4 text-center"></p><div class="flex justify-end gap-4 mt-6"><button id="cancel-justify-btn" class="py-2 px-4 rounded-md text-gray-700 bg-gray-200 hover:bg-gray-300">Cancelar</button><button id="save-justify-btn" class="py-2 px-4 rounded-md text-white bg-green-600 hover:bg-green-700">Salvar Justificativa</button></div></div></div>
+    
+    <div id="final-report-modal" class="modal">
+        <div class="modal-content max-w-3xl w-full">
+            <span id="close-final-report-modal" class="float-right text-2xl font-bold cursor-pointer">&times;</span>
+            <h3 class="text-lg font-bold mb-4">Relatório Final de Horas</h3>
+            <div id="final-report-content" class="space-y-3 text-gray-700">
+                <!-- Report details will be injected here -->
             </div>
-        </div>
-    </div>
-    <div id="edit-modal" class="modal">
-        <div class="modal-content">
-            <h3 class="text-lg font-medium mb-4">Editar Registro de Ponto</h3>
-            <div class="mb-4">
-                <label for="edit-time-input" class="block text-sm font-medium text-gray-700 mb-1">Horário:</label>
-                <input type="time" id="edit-time-input" class="w-full px-3 py-2 border rounded-md">
-            </div>
-            <div class="flex justify-end gap-4">
-                <button id="cancel-edit-btn" class="py-2 px-4 rounded-md text-gray-700 bg-gray-200 hover:bg-gray-300">Cancelar</button>
-                <button id="save-edit-btn" class="py-2 px-4 rounded-md text-white bg-green-600 hover:bg-green-700">Salvar</button>
-            </div>
-        </div>
-    </div>
-    <div id="add-entry-modal" class="modal">
-        <div class="modal-content">
-            <h3 class="text-lg font-medium mb-4">Adicionar/Editar Batidas do Dia</h3>
-            <p id="add-entry-date" class="text-sm font-bold mb-4 text-gray-700"></p>
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label for="add-entry-in-1" class="block text-sm font-medium text-gray-700 mb-1">Entrada:</label>
-                    <input type="time" id="add-entry-in-1" class="w-full px-3 py-2 border rounded-md">
-                </div>
-                 <div>
-                    <label for="add-entry-out-1" class="block text-sm font-medium text-gray-700 mb-1">Saída:</label>
-                    <input type="time" id="add-entry-out-1" class="w-full px-3 py-2 border rounded-md">
-                </div>
-            </div>
-            <p id="add-entry-message" class="text-sm mt-4 text-center"></p>
             <div class="flex justify-end gap-4 mt-6">
-                <button id="cancel-add-btn" class="py-2 px-4 rounded-md text-gray-700 bg-gray-200 hover:bg-gray-300">Cancelar</button>
-                <button id="save-add-btn" class="py-2 px-4 rounded-md text-white bg-green-600 hover:bg-green-700">Salvar</button>
+                <button id="download-final-pdf-btn" class="py-2 px-4 rounded-md text-white bg-blue-600 hover:bg-blue-700">Baixar PDF</button>
             </div>
         </div>
     </div>
-    <div id="justify-modal" class="modal">
-        <div class="modal-content">
-            <h3 class="text-lg font-medium mb-4">Justificar/Abonar Dia</h3>
-            <p id="justify-date" class="text-sm font-bold mb-4 text-gray-700"></p>
-            <div>
-                <label for="justify-reason" class="block text-sm font-medium text-gray-700 mb-1">Motivo:</label>
-                <input type="text" id="justify-reason" class="w-full px-3 py-2 border rounded-md" placeholder="Ex: Feriado, Atestado Médico...">
-            </div>
-            <p id="justify-message" class="text-sm mt-4 text-center"></p>
-            <div class="flex justify-end gap-4 mt-6">
-                <button id="cancel-justify-btn" class="py-2 px-4 rounded-md text-gray-700 bg-gray-200 hover:bg-gray-300">Cancelar</button>
-                <button id="save-justify-btn" class="py-2 px-4 rounded-md text-white bg-green-600 hover:bg-green-700">Salvar Justificativa</button>
-            </div>
-        </div>
-    </div>
+
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
@@ -262,16 +243,27 @@
             justifyMessage: document.getElementById('justify-message'),
             cancelJustifyBtn: document.getElementById('cancel-justify-btn'),
             saveJustifyBtn: document.getElementById('save-justify-btn'),
+            usersManagementTableBody: document.getElementById('users-management-table-body'),
+            finalReportModal: document.getElementById('final-report-modal'),
+            finalReportContent: document.getElementById('final-report-content'),
+            closeFinalReportModal: document.getElementById('close-final-report-modal'),
+            downloadFinalPdfBtn: document.getElementById('download-final-pdf-btn'),
+            requestUserFilter: document.getElementById('request-user-filter'),
+            requestStartDateFilter: document.getElementById('request-start-date-filter'),
+            requestEndDateFilter: document.getElementById('request-end-date-filter'),
+            requestSearchFilter: document.getElementById('request-search-filter'),
         };
 
 
         let unsubscribe = { users: null, requests: null, entries: null };
         let allUsers = [];
+        let allRequests = [];
         let recordToEdit = null;
         let recordToDelete = null;
         let requestToDelete = null;
         let entryToAddOrEdit = null;
         let dayToJustify = null;
+        let userToFinalize = null;
 
 
         onAuthStateChanged(auth, async (user) => {
@@ -308,32 +300,29 @@
             const usersRef = collection(db, 'users');
             unsubscribe.users = onSnapshot(usersRef, (usersSnapshot) => {
                 allUsers = usersSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-                renderUserDropdown(allUsers, role, team);
+                const filteredEmployees = allUsers.filter(u => u.role === 'employee' && (role === 'general_manager' || (role === 'nupap_manager' && u.team === 'nupap') || (role === 'nudof_manager' && u.team === 'nudof')));
+
+                renderUserDropdown(filteredEmployees.filter(u => u.status !== 'inactive'));
+                renderUsersManagementTable(filteredEmployees);
+                setupRequestFilters(filteredEmployees);
                 
                 if (unsubscribe.requests) unsubscribe.requests();
                 const requestsRef = collection(db, `/artifacts/${appId}/requests`);
                 unsubscribe.requests = onSnapshot(query(requestsRef, orderBy("createdAt", "desc")), (requestsSnapshot) => {
-                    const requests = requestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                    renderRequestsTable(requests, allUsers, role, team);
+                    allRequests = requestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    filterAndRenderRequests();
                 });
             });
         }
 
 
-        function renderUserDropdown(users, role, team) {
-            ui.userDropdown.innerHTML = '';
-            const allOption = document.createElement('option');
-            allOption.value = '';
-            allOption.textContent = 'Selecione um funcionário';
-            ui.userDropdown.appendChild(allOption);
-            
-            users.filter(u => u.role === 'employee').forEach(user => {
-                if (role === 'general_manager' || (role === 'nupap_manager' && user.team === 'nupap') || (role === 'nudof_manager' && user.team === 'nudof')) {
-                    const option = document.createElement('option');
-                    option.value = user.id;
-                    option.textContent = user.name;
-                    ui.userDropdown.appendChild(option);
-                }
+        function renderUserDropdown(users) {
+            ui.userDropdown.innerHTML = '<option value="">Selecione um funcionário</option>';
+            users.forEach(user => {
+                const option = document.createElement('option');
+                option.value = user.id;
+                option.textContent = user.name;
+                ui.userDropdown.appendChild(option);
             });
         }
         
@@ -365,23 +354,19 @@
             ui.downloadPdfBtn.classList.add('hidden');
             ui.noReportMessage.classList.add('hidden');
 
-
             const entriesRef = collection(db, 'artifacts', appId, 'users', userId, 'time_entries');
             const entriesQuery = query(entriesRef, orderBy("timestamp", "asc"));
             
             const entriesSnapshot = await getDocs(entriesQuery);
             const allEntries = entriesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
 
-
             const filteredEntries = allEntries.filter(entry => {
                 const entryDate = entry.timestamp.toDate();
                 return entryDate.getFullYear() === year && (entryDate.getMonth() + 1) === month;
             });
 
-
             await renderMonthlyReportTable(filteredEntries, userId, month, year);
         }
-
 
         async function renderMonthlyReportTable(entries, userId, month, year) {
             const userName = allUsers.find(u => u.id === userId)?.name;
@@ -390,15 +375,7 @@
             
             ui.reportTitle.textContent = `Relatório para ${userName} - ${monthName}`;
             ui.reportTableBody.innerHTML = '';
-            ui.reportTableHead.innerHTML = `
-                <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dia da Semana</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Entradas</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saídas</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saldo do Dia</th>
-                </tr>
-            `;
+            ui.reportTableHead.innerHTML = `<tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dia da Semana</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Entradas</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saídas</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saldo do Dia</th></tr>`;
             ui.noReportMessage.classList.add('hidden');
             
             const requestsRef = collection(db, `/artifacts/${appId}/requests`);
@@ -416,7 +393,6 @@
                 }
             });
 
-
             const entriesByDay = entries.reduce((acc, entry) => {
                 const date = entry.timestamp.toDate().toLocaleDateString('pt-BR');
                 if (!acc[date]) acc[date] = [];
@@ -424,10 +400,8 @@
                 return acc;
             }, {});
 
-
             let totalMonthlyBalanceMs = 0;
             const daysInMonth = new Date(year, month, 0).getDate();
-
 
             for (let day = 1; day <= daysInMonth; day++) {
                 const currentDate = new Date(year, month - 1, day);
@@ -435,14 +409,8 @@
                 const dayOfWeek = currentDate.toLocaleDateString('pt-BR', { weekday: 'short' });
                 const dayIndex = currentDate.getDay();
                 const isWeekend = dayIndex === 0 || dayIndex === 6;
-                
-                let ins = '---';
-                let outs = '---';
-                let dailyBalanceText = '---';
-                let dailyBalanceClass = 'text-gray-700';
-
+                let ins = '---', outs = '---', dailyBalanceText = '---', dailyBalanceClass = 'text-gray-700';
                 const isFutureDay = currentDate > today && currentDate.setHours(0,0,0,0) > today.setHours(0,0,0,0);
-
 
                 if (isWeekend) {
                     dailyBalanceText = 'Fim de Semana';
@@ -452,12 +420,8 @@
                 } else {
                     const dayEntries = entriesByDay[dateString] || [];
                     const justification = approvedRequests[dateString];
-
-
                     ins = dayEntries.length > 0 ? dayEntries.filter(e => e.type === 'in').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).join(', ') : '---';
                     outs = dayEntries.length > 0 ? dayEntries.filter(e => e.type === 'out').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).join(', ') : '---';
-
-
                     if (justification) {
                         dailyBalanceText = justification;
                         dailyBalanceClass = 'text-blue-600';
@@ -484,13 +448,10 @@
                         dailyBalanceClass = dailyBalanceMs >= 0 ? 'text-green-600' : 'text-red-600';
                     }
                 }
-
-
                 const row = document.createElement('tr');
                 row.innerHTML = `<td class="px-6 py-4">${dateString}</td><td class="px-6 py-4 capitalize">${dayOfWeek.replace('.','')}</td><td class="px-6 py-4">${ins}</td><td class="px-6 py-4">${outs}</td><td class="px-6 py-4 font-medium ${dailyBalanceClass}">${dailyBalanceText}</td>`;
                 ui.reportTableBody.appendChild(row);
             }
-
 
             ui.monthlyBalance.textContent = `Saldo total do mês: ${formatMilliseconds(totalMonthlyBalanceMs, true)}`;
             ui.monthlyBalance.className = `mt-4 p-4 rounded-md font-bold text-center ${totalMonthlyBalanceMs >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
@@ -512,7 +473,6 @@
                 const [year, month] = selectedDate.split('-');
                 await loadOccurrence(selectedUserId, parseInt(month, 10), parseInt(year, 10));
                 ui.occurrenceSection.classList.remove('hidden');
-
 
                 const entriesRef = collection(db, 'artifacts', appId, 'users', selectedUserId, 'time_entries');
                 const entriesQuery = query(entriesRef, orderBy("timestamp", "asc"));
@@ -546,7 +506,6 @@
                 const snapshot = await getDocs(entriesQuery);
                 const allEntries = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
                 renderEditableDailyHistory(allEntries, selectedUserId);
-
             }
         });
 
@@ -558,15 +517,7 @@
 
             ui.reportTitle.textContent = `Histórico Editável para ${userName}`;
             ui.reportTableBody.innerHTML = '';
-            ui.reportTableHead.innerHTML = `
-                <tr>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dia da Semana</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Entradas</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saídas</th>
-                    <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
-                </tr>
-            `;
+            ui.reportTableHead.innerHTML = `<tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dia da Semana</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Entradas</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saídas</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th></tr>`;
             ui.noReportMessage.classList.add('hidden');
             
             const entriesByDay = allEntries.reduce((acc, entry) => {
@@ -595,34 +546,13 @@
                 const outs = dayEntries.filter(e => e.type === 'out').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).sort().join(', ');
 
                 const row = document.createElement('tr');
-                const actionsHtml = isWeekend 
-                    ? '---' 
-                    : `<div class="flex gap-2">
-                           <button class="edit-day-btn text-blue-600 hover:text-blue-900" data-date="${currentDate.toISOString()}" data-user-id="${userId}">Editar</button>
-                           <button class="justify-day-btn text-green-600 hover:text-green-900" data-date="${currentDate.toISOString()}" data-user-id="${userId}">Justificar</button>
-                       </div>`;
-
-                row.innerHTML = `
-                    <td class="px-6 py-4">${dateString}</td>
-                    <td class="px-6 py-4 capitalize">${dayOfWeek.replace('.','')}</td>
-                    <td class="px-6 py-4">${ins || '---'}</td>
-                    <td class="px-6 py-4">${outs || '---'}</td>
-                    <td class="px-6 py-4">${actionsHtml}</td>
-                `;
+                const actionsHtml = isWeekend ? '---' : `<div class="flex gap-2"><button class="edit-day-btn text-blue-600 hover:text-blue-900" data-date="${currentDate.toISOString()}" data-user-id="${userId}">Editar</button><button class="justify-day-btn text-green-600 hover:text-green-900" data-date="${currentDate.toISOString()}" data-user-id="${userId}">Justificar</button></div>`;
+                row.innerHTML = `<td class="px-6 py-4">${dateString}</td><td class="px-6 py-4 capitalize">${dayOfWeek.replace('.','')}</td><td class="px-6 py-4">${ins || '---'}</td><td class="px-6 py-4">${outs || '---'}</td><td class="px-6 py-4">${actionsHtml}</td>`;
                 ui.reportTableBody.appendChild(row);
             }
 
-            document.querySelectorAll('.edit-day-btn').forEach(button => {
-                button.addEventListener('click', (e) => {
-                    showAddEntryModal(e.target.dataset.date, e.target.dataset.userId);
-                });
-            });
-
-            document.querySelectorAll('.justify-day-btn').forEach(button => {
-                button.addEventListener('click', (e) => {
-                    showJustifyModal(e.target.dataset.date, e.target.dataset.userId);
-                });
-            });
+            document.querySelectorAll('.edit-day-btn').forEach(button => button.addEventListener('click', (e) => showAddEntryModal(e.target.dataset.date, e.target.dataset.userId)));
+            document.querySelectorAll('.justify-day-btn').forEach(button => button.addEventListener('click', (e) => showJustifyModal(e.target.dataset.date, e.target.dataset.userId)));
         }
         
         async function showAddEntryModal(dateStr, userId) {
@@ -635,33 +565,21 @@
             ui.addEntryMessage.textContent = ''; 
 
             const entriesRef = collection(db, 'artifacts', appId, 'users', userId, 'time_entries');
-            const startOfDay = new Date(date);
-            startOfDay.setHours(0, 0, 0, 0);
-            const endOfDay = new Date(date);
-            endOfDay.setHours(23, 59, 59, 999);
-
-            const q = query(entriesRef, 
-                where("timestamp", ">=", Timestamp.fromDate(startOfDay)),
-                where("timestamp", "<=", Timestamp.fromDate(endOfDay))
-            );
+            const startOfDay = new Date(date); startOfDay.setHours(0, 0, 0, 0);
+            const endOfDay = new Date(date); endOfDay.setHours(23, 59, 59, 999);
+            const q = query(entriesRef, where("timestamp", ">=", Timestamp.fromDate(startOfDay)), where("timestamp", "<=", Timestamp.fromDate(endOfDay)));
             
             try {
                 const entriesSnapshot = await getDocs(q);
-                const dayEntries = entriesSnapshot.docs
-                    .map(doc => doc.data())
-                    .sort((a, b) => a.timestamp.toMillis() - b.timestamp.toMillis());
-
+                const dayEntries = entriesSnapshot.docs.map(doc => doc.data()).sort((a, b) => a.timestamp.toMillis() - b.timestamp.toMillis());
                 const ins = dayEntries.filter(e => e.type === 'in');
                 const outs = dayEntries.filter(e => e.type === 'out');
-                
                 const formatTime = (ts) => ts.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-
                 if (ins[0]) ui.addEntryIn1.value = formatTime(ins[0].timestamp);
                 if (outs[0]) ui.addEntryOut1.value = formatTime(outs[0].timestamp);
-
             } catch (error) {
                 console.error("Erro ao buscar batidas do dia:", error);
-                ui.addEntryMessage.textContent = "Não foi possível carregar as batidas existentes. Pode ser necessário criar um índice no Firestore.";
+                ui.addEntryMessage.textContent = "Não foi possível carregar as batidas. Pode ser necessário criar um índice no Firestore.";
                 ui.addEntryMessage.className = 'text-sm mt-4 text-center text-red-600';
             }
             
@@ -679,7 +597,6 @@
 
         async function saveJustification() {
             if (!dayToJustify) return;
-
             const { userId, date } = dayToJustify;
             const reason = ui.justifyReason.value.trim();
             if (!reason) {
@@ -691,65 +608,41 @@
             const msgEl = ui.justifyMessage;
             msgEl.textContent = 'Salvando...';
             msgEl.className = 'text-sm mt-4 text-center text-gray-600';
-            ui.saveJustifyBtn.disabled = true;
-            ui.cancelJustifyBtn.disabled = true;
-
+            ui.saveJustifyBtn.disabled = true; ui.cancelJustifyBtn.disabled = true;
             const user = allUsers.find(u => u.id === userId);
             if (!user) {
                 msgEl.textContent = 'Usuário não encontrado.';
                 msgEl.className = 'text-sm mt-4 text-center text-red-600';
-                ui.saveJustifyBtn.disabled = false;
-                ui.cancelJustifyBtn.disabled = false;
+                ui.saveJustifyBtn.disabled = false; ui.cancelJustifyBtn.disabled = false;
                 return;
             }
 
-            const newRequest = {
-                userId: userId,
-                userName: user.name,
-                date: date.toLocaleDateString('pt-BR'),
-                text: reason,
-                status: 'approved',
-                createdAt: Timestamp.now()
-            };
-
+            const newRequest = { userId: userId, userName: user.name, date: date.toLocaleDateString('pt-BR'), text: reason, status: 'approved', createdAt: Timestamp.now() };
             try {
                 await addDoc(collection(db, `artifacts/${appId}/requests`), newRequest);
                 msgEl.textContent = "Justificativa salva com sucesso!";
                 msgEl.className = 'text-sm mt-4 text-center text-green-600';
-
                 setTimeout(() => {
-                    ui.justifyModal.style.display = 'none';
-                    dayToJustify = null;
-                    msgEl.textContent = '';
-                    ui.saveJustifyBtn.disabled = false;
-                    ui.cancelJustifyBtn.disabled = false;
+                    ui.justifyModal.style.display = 'none'; dayToJustify = null; msgEl.textContent = '';
+                    ui.saveJustifyBtn.disabled = false; ui.cancelJustifyBtn.disabled = false;
                     ui.generateReportBtn.click();
                 }, 1500);
-
             } catch (error) {
                 console.error("Erro ao salvar justificativa:", error);
                 msgEl.textContent = "Erro ao salvar a justificativa.";
                 msgEl.className = 'text-sm mt-4 text-center text-red-600';
-                ui.saveJustifyBtn.disabled = false;
-                ui.cancelJustifyBtn.disabled = false;
+                ui.saveJustifyBtn.disabled = false; ui.cancelJustifyBtn.disabled = false;
             }
         }
 
         async function saveDayEntries() {
             if (!entryToAddOrEdit) return;
-
             const { userId, date } = entryToAddOrEdit;
             const msgEl = ui.addEntryMessage;
             msgEl.textContent = 'Salvando...';
             msgEl.className = 'text-sm mt-4 text-center text-gray-600';
-            ui.saveAddBtn.disabled = true;
-            ui.cancelAddBtn.disabled = true;
-
-            const times = [
-                { time: ui.addEntryIn1.value, type: 'in' },
-                { time: ui.addEntryOut1.value, type: 'out' },
-            ];
-
+            ui.saveAddBtn.disabled = true; ui.cancelAddBtn.disabled = true;
+            const times = [{ time: ui.addEntryIn1.value, type: 'in' }, { time: ui.addEntryOut1.value, type: 'out' }];
             const newEntries = [];
             for (const entry of times) {
                 if (entry.time) {
@@ -757,164 +650,144 @@
                     if (isNaN(hours) || isNaN(minutes)) continue;
                     const newDate = new Date(date);
                     newDate.setHours(hours, minutes, 0, 0);
-                    newEntries.push({
-                        timestamp: Timestamp.fromDate(newDate),
-                        type: entry.type,
-                        source: 'admin_edit'
-                    });
+                    newEntries.push({ timestamp: Timestamp.fromDate(newDate), type: entry.type, source: 'admin_edit' });
                 }
             }
-
             try {
                 const entriesRef = collection(db, `artifacts/${appId}/users/${userId}/time_entries`);
-                const startOfDay = new Date(date);
-                startOfDay.setHours(0, 0, 0, 0);
-                const endOfDay = new Date(date);
-                endOfDay.setHours(23, 59, 59, 999);
-                
-                const q = query(entriesRef, 
-                    where("timestamp", ">=", Timestamp.fromDate(startOfDay)),
-                    where("timestamp", "<=", Timestamp.fromDate(endOfDay))
-                );
-                
+                const startOfDay = new Date(date); startOfDay.setHours(0, 0, 0, 0);
+                const endOfDay = new Date(date); endOfDay.setHours(23, 59, 59, 999);
+                const q = query(entriesRef, where("timestamp", ">=", Timestamp.fromDate(startOfDay)), where("timestamp", "<=", Timestamp.fromDate(endOfDay)));
                 const entriesToDeleteSnapshot = await getDocs(q);
                 const deletePromises = entriesToDeleteSnapshot.docs.map(docSnap => deleteDoc(docSnap.ref));
                 await Promise.all(deletePromises);
-
                 const addPromises = newEntries.map(entryData => addDoc(entriesRef, entryData));
                 await Promise.all(addPromises);
-
                 msgEl.textContent = "Batidas salvas com sucesso!";
                 msgEl.className = 'text-sm mt-4 text-center text-green-600';
-
                 setTimeout(() => {
-                    ui.addEntryModal.style.display = 'none';
-                    entryToAddOrEdit = null;
-                    msgEl.textContent = '';
-                    ui.saveAddBtn.disabled = false;
-                    ui.cancelAddBtn.disabled = false;
+                    ui.addEntryModal.style.display = 'none'; entryToAddOrEdit = null; msgEl.textContent = '';
+                    ui.saveAddBtn.disabled = false; ui.cancelAddBtn.disabled = false;
                 }, 1500);
-
             } catch (error) {
                 console.error("Erro ao salvar batidas:", error);
                 msgEl.textContent = "Erro ao salvar. Pode ser necessário criar um índice no Firestore.";
                 msgEl.className = 'text-sm mt-4 text-center text-red-600';
-                ui.saveAddBtn.disabled = false;
-                ui.cancelAddBtn.disabled = false;
+                ui.saveAddBtn.disabled = false; ui.cancelAddBtn.disabled = false;
             }
         }
         
         ui.saveAddBtn.addEventListener('click', saveDayEntries);
-        ui.cancelAddBtn.addEventListener('click', () => {
-            ui.addEntryModal.style.display = 'none';
-            entryToAddOrEdit = null;
-        });
+        ui.cancelAddBtn.addEventListener('click', () => { ui.addEntryModal.style.display = 'none'; entryToAddOrEdit = null; });
 
         ui.confirmDeleteBtn.addEventListener('click', async () => {
             if (recordToDelete) {
-                const { userId, recordId } = recordToDelete;
-                try {
-                    await deleteDoc(doc(db, `artifacts/${appId}/users/${userId}/time_entries`, recordId));
-                } catch (error) {
-                    console.error("Erro ao apagar registro:", error);
-                }
+                try { await deleteDoc(doc(db, `artifacts/${appId}/users/${recordToDelete.userId}/time_entries`, recordToDelete.recordId)); } catch (error) { console.error("Erro ao apagar registro:", error); }
             } else if (requestToDelete) {
-                try {
-                    await deleteDoc(doc(db, `/artifacts/${appId}/requests`, requestToDelete));
-                } catch (error) {
-                    console.error("Erro ao apagar solicitação:", error);
-                }
+                try { await deleteDoc(doc(db, `/artifacts/${appId}/requests`, requestToDelete)); } catch (error) { console.error("Erro ao apagar solicitação:", error); }
+            } else if (userToFinalize) {
+                await finalizeUserActivity(userToFinalize);
             }
-            
-            recordToDelete = null;
-            requestToDelete = null;
+            recordToDelete = null; requestToDelete = null; userToFinalize = null;
             ui.deleteConfirmModal.style.display = 'none';
+            document.getElementById('confirm-delete-btn').textContent = 'Apagar';
+            document.getElementById('confirm-delete-btn').className = 'py-2 px-4 rounded-md text-white bg-red-600 hover:bg-red-700';
         });
-
 
         ui.cancelDeleteBtn.addEventListener('click', () => {
-            recordToDelete = null;
-            requestToDelete = null;
+            recordToDelete = null; requestToDelete = null; userToFinalize = null;
             ui.deleteConfirmModal.style.display = 'none';
+            document.getElementById('confirm-delete-btn').textContent = 'Apagar';
+            document.getElementById('confirm-delete-btn').className = 'py-2 px-4 rounded-md text-white bg-red-600 hover:bg-red-700';
         });
-
 
         ui.saveEditBtn.addEventListener('click', async () => {
             if (recordToEdit) {
                 const { userId, recordId, date } = recordToEdit;
-                const newTime = ui.editTimeInput.value;
-                const [newHours, newMinutes] = newTime.split(':').map(Number);
-                
-                const newDate = new Date(date);
-                newDate.setHours(newHours);
-                newDate.setMinutes(newMinutes);
-                newDate.setSeconds(0);
-
-
-                try {
-                    await updateDoc(doc(db, `artifacts/${appId}/users/${userId}/time_entries`, recordId), {
-                        timestamp: Timestamp.fromDate(newDate)
-                    });
-                } catch (error) {
-                    console.error("Erro ao editar registro:", error);
-                } finally {
-                    recordToEdit = null;
-                    ui.editModal.style.display = 'none';
-                }
+                const [newHours, newMinutes] = ui.editTimeInput.value.split(':').map(Number);
+                const newDate = new Date(date); newDate.setHours(newHours, newMinutes, 0);
+                try { await updateDoc(doc(db, `artifacts/${appId}/users/${userId}/time_entries`, recordId), { timestamp: Timestamp.fromDate(newDate) }); } catch (error) { console.error("Erro ao editar registro:", error); } 
+                finally { recordToEdit = null; ui.editModal.style.display = 'none'; }
             }
         });
 
+        ui.cancelEditBtn.addEventListener('click', () => { recordToEdit = null; ui.editModal.style.display = 'none'; });
 
-        ui.cancelEditBtn.addEventListener('click', () => {
-            recordToEdit = null;
-            ui.editModal.style.display = 'none';
-        });
+        function setupRequestFilters(users) {
+            ui.requestUserFilter.innerHTML = '<option value="">Todos os Funcionários</option>';
+            users.forEach(user => {
+                const option = document.createElement('option');
+                option.value = user.id;
+                option.textContent = user.name;
+                ui.requestUserFilter.appendChild(option);
+            });
 
-
-        function renderRequestsTable(requests, users, role, team) {
-            ui.requestTableBody.innerHTML = '';
-            requests.forEach(req => {
-                const user = users.find(u => u.id === req.userId);
-                if (!user) return;
-                
-                const isManagerForTeam = (role === 'nupap_manager' && user.team === 'nupap') || (role === 'nudof_manager' && user.team === 'nudof');
-                if (role === 'general_manager' || isManagerForTeam) {
-                    const statusClass = req.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : req.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td class="px-6 py-4">${req.userName}</td>
-                        <td class="px-6 py-4">${req.date}</td>
-                        <td class="px-6 py-4 text-xs font-semibold whitespace-nowrap"><span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">${req.status.toUpperCase()}</span></td>
-                        <td class="px-6 py-4">${req.text}</td>
-                        <td class="px-6 py-4 text-sm text-gray-500">
-                            ${req.status === 'pending' ? `<button class="approve-btn text-green-600 hover:text-green-900 mr-2" data-request-id="${req.id}">Aprovar</button><button class="decline-btn text-red-600 hover:text-red-900 mr-2" data-request-id="${req.id}">Recusar</button>` : ''}
-                            <button class="delete-request-btn text-red-600 hover:text-red-900" data-request-id="${req.id}">Apagar</button>
-                        </td>
-                    `;
-                    row.querySelector('.approve-btn')?.addEventListener('click', (e) => updateRequestStatus(e.target.dataset.requestId, 'approved'));
-                    row.querySelector('.decline-btn')?.addEventListener('click', (e) => updateRequestStatus(e.target.dataset.requestId, 'declined'));
-                    row.querySelector('.delete-request-btn')?.addEventListener('click', (e) => {
-                        recordToDelete = null;
-                        requestToDelete = e.target.dataset.requestId;
-                        document.getElementById('delete-modal-title').textContent = 'Confirmar Exclusão de Solicitação';
-                        document.getElementById('delete-modal-text').textContent = 'Tem certeza que deseja apagar esta solicitação? Esta ação não pode ser desfeita.';
-                        ui.deleteConfirmModal.style.display = 'flex';
-                    });
-                    ui.requestTableBody.appendChild(row);
-                }
+            [ui.requestUserFilter, ui.requestStartDateFilter, ui.requestEndDateFilter, ui.requestSearchFilter].forEach(el => {
+                el.addEventListener('change', filterAndRenderRequests);
+                if (el.type === 'text') el.addEventListener('keyup', filterAndRenderRequests);
             });
         }
 
+        function filterAndRenderRequests() {
+            const selectedUserId = ui.requestUserFilter.value;
+            const startDate = ui.requestStartDateFilter.value ? new Date(ui.requestStartDateFilter.value + 'T00:00:00') : null;
+            const endDate = ui.requestEndDateFilter.value ? new Date(ui.requestEndDateFilter.value + 'T23:59:59') : null;
+            const searchText = ui.requestSearchFilter.value.toLowerCase();
 
-        async function updateRequestStatus(requestId, status) {
-            const requestDocRef = doc(db, `/artifacts/${appId}/requests`, requestId);
-            await updateDoc(requestDocRef, { status });
+            let filteredRequests = allRequests;
+
+            if (selectedUserId) {
+                filteredRequests = filteredRequests.filter(req => req.userId === selectedUserId);
+            }
+            if (startDate) {
+                filteredRequests = filteredRequests.filter(req => {
+                    const [day, month, year] = req.date.split('/');
+                    return new Date(`${year}-${month}-${day}`) >= startDate;
+                });
+            }
+            if (endDate) {
+                filteredRequests = filteredRequests.filter(req => {
+                    const [day, month, year] = req.date.split('/');
+                    return new Date(`${year}-${month}-${day}`) <= endDate;
+                });
+            }
+            if (searchText) {
+                filteredRequests = filteredRequests.filter(req => req.text.toLowerCase().includes(searchText));
+            }
+            renderRequestsTable(filteredRequests);
         }
 
+        function renderRequestsTable(requests) {
+            ui.requestTableBody.innerHTML = '';
+            requests.forEach(req => {
+                const statusClass = req.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : req.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="px-6 py-4">${req.userName}</td><td class="px-6 py-4">${req.date}</td>
+                    <td class="px-6 py-4 text-xs font-semibold whitespace-nowrap"><span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">${req.status.toUpperCase()}</span></td>
+                    <td class="px-6 py-4">${req.text}</td>
+                    <td class="px-6 py-4 text-sm text-gray-500">
+                        ${req.status === 'pending' ? `<button class="approve-btn text-green-600 hover:text-green-900 mr-2" data-request-id="${req.id}">Aprovar</button><button class="decline-btn text-red-600 hover:text-red-900 mr-2" data-request-id="${req.id}">Recusar</button>` : ''}
+                        <button class="delete-request-btn text-red-600 hover:text-red-900" data-request-id="${req.id}">Apagar</button>
+                    </td>`;
+                row.querySelector('.approve-btn')?.addEventListener('click', (e) => updateRequestStatus(e.target.dataset.requestId, 'approved'));
+                row.querySelector('.decline-btn')?.addEventListener('click', (e) => updateRequestStatus(e.target.dataset.requestId, 'declined'));
+                row.querySelector('.delete-request-btn')?.addEventListener('click', (e) => {
+                    userToFinalize = null; recordToDelete = null; requestToDelete = e.target.dataset.requestId;
+                    document.getElementById('delete-modal-title').textContent = 'Confirmar Exclusão de Solicitação';
+                    document.getElementById('delete-modal-text').textContent = 'Tem certeza que deseja apagar esta solicitação? Esta ação não pode ser desfeita.';
+                    ui.deleteConfirmModal.style.display = 'flex';
+                });
+                ui.requestTableBody.appendChild(row);
+            });
+        }
+
+        async function updateRequestStatus(requestId, status) {
+            await updateDoc(doc(db, `/artifacts/${appId}/requests`, requestId), { status });
+        }
 
         function formatMilliseconds(ms, showSign = false) {
-            const isNegative = ms < 0;
-            if (isNegative) ms = -ms;
+            const isNegative = ms < 0; if (isNegative) ms = -ms;
             const hours = Math.floor(ms / 3600000);
             const minutes = Math.floor((ms % 3600000) / 60000);
             const sign = isNegative ? '-' : (showSign ? '+' : '');
@@ -923,47 +796,29 @@
         
         async function loadOccurrence(userId, month, year) {
             if (!userId || !month || !year) return;
-            ui.occurrenceDetails.value = '';
-            ui.occurrenceStatus.textContent = '';
+            ui.occurrenceDetails.value = ''; ui.occurrenceStatus.textContent = '';
             try {
                 const reportId = `${year}-${String(month).padStart(2, '0')}`;
                 const reportDocRef = doc(db, 'artifacts', appId, 'users', userId, 'reports', reportId);
                 const reportDocSnap = await getDoc(reportDocRef);
-                if (reportDocSnap.exists()) {
-                    ui.occurrenceDetails.value = reportDocSnap.data().occurrenceText || '';
-                }
-            } catch (error) {
-                console.error("Erro ao carregar ocorrência:", error);
-            }
+                if (reportDocSnap.exists()) { ui.occurrenceDetails.value = reportDocSnap.data().occurrenceText || ''; }
+            } catch (error) { console.error("Erro ao carregar ocorrência:", error); }
         }
 
-
         async function saveOccurrence() {
-            const selectedUserId = ui.userDropdown.value;
-            const selectedDate = ui.monthSelector.value;
+            const selectedUserId = ui.userDropdown.value; const selectedDate = ui.monthSelector.value;
             if (!selectedUserId || !selectedDate) {
                 ui.occurrenceStatus.textContent = 'Selecione um funcionário e um mês.';
                 ui.occurrenceStatus.className = 'text-sm text-red-500 mr-4';
                 return;
             }
-
-
             const [year, month] = selectedDate.split('-');
-            const occurrenceText = ui.occurrenceDetails.value;
             const reportId = `${year}-${month}`;
             const reportDocRef = doc(db, 'artifacts', appId, 'users', selectedUserId, 'reports', reportId);
-
-
             ui.occurrenceStatus.textContent = 'Salvando...';
             ui.occurrenceStatus.className = 'text-sm text-gray-500 mr-4';
-
-
             try {
-                await setDoc(reportDocRef, { 
-                    occurrenceText: occurrenceText 
-                }, { merge: true });
-
-
+                await setDoc(reportDocRef, { occurrenceText: ui.occurrenceDetails.value }, { merge: true });
                 ui.occurrenceStatus.textContent = 'Salvo com sucesso!';
                 ui.occurrenceStatus.className = 'text-sm text-green-600 mr-4';
                 setTimeout(() => { ui.occurrenceStatus.textContent = ''; }, 3000);
@@ -975,103 +830,192 @@
         }
         ui.saveOccurrenceBtn.addEventListener('click', saveOccurrence);
 
-
         async function generatePdf() {
-            const { jsPDF } = window.jspdf;
-            const doc = new jsPDF();
-
-
+            const { jsPDF } = window.jspdf; const doc = new jsPDF();
             const selectedUserId = ui.userDropdown.value;
             const userName = allUsers.find(u => u.id === selectedUserId)?.name || 'Usuário';
-            const selectedDate = ui.monthSelector.value;
-            const [year, month] = selectedDate.split('-').map(Number);
+            const [year, month] = ui.monthSelector.value.split('-').map(Number);
             const monthName = new Date(year, month - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
-
-
-            doc.setFontSize(18);
-            doc.text(`Relatório de Ponto - ${userName}`, 14, 22);
-            doc.setFontSize(12);
-            doc.text(`Período: ${monthName}`, 14, 30);
-
-
+            doc.setFontSize(18); doc.text(`Relatório de Ponto - ${userName}`, 14, 22);
+            doc.setFontSize(12); doc.text(`Período: ${monthName}`, 14, 30);
             const head = [['Data', 'Dia da Semana', 'Entradas', 'Saídas', 'Saldo do Dia']];
-            const body = [];
-            ui.reportTableBody.querySelectorAll('tr').forEach(row => {
-                const rowData = [];
-                row.querySelectorAll('td').forEach(cell => rowData.push(cell.innerText));
-                body.push(rowData);
-            });
-
-
-            doc.autoTable({
-                head: head,
-                body: body,
-                startY: 40,
-                theme: 'striped',
-                headStyles: { fillColor: [22, 160, 133] },
-            });
-
-
+            const body = Array.from(ui.reportTableBody.querySelectorAll('tr')).map(row => Array.from(row.querySelectorAll('td')).map(cell => cell.innerText));
+            doc.autoTable({ head, body, startY: 40, theme: 'striped', headStyles: { fillColor: [22, 160, 133] } });
             let finalY = doc.lastAutoTable.finalY;
-
-
             const requestsRef = collection(db, `/artifacts/${appId}/requests`);
             const q = query(requestsRef, where("userId", "==", selectedUserId), where("status", "==", "approved"));
             const requestsSnapshot = await getDocs(q);
-            
-            const monthRequests = requestsSnapshot.docs
-                .map(doc => doc.data())
-                .filter(req => {
-                    if (!req.date) return false;
-                    const [reqDay, reqMonth, reqYear] = req.date.split('/');
-                    return parseInt(reqYear, 10) === year && parseInt(reqMonth, 10) === month;
-                });
-
-
+            const monthRequests = requestsSnapshot.docs.map(d => d.data()).filter(req => {
+                if (!req.date) return false;
+                const [, reqMonth, reqYear] = req.date.split('/');
+                return parseInt(reqYear, 10) === year && parseInt(reqMonth, 10) === month;
+            });
             if (monthRequests.length > 0) {
-                doc.setFontSize(14);
-                doc.text('Solicitações Autorizadas', 14, finalY + 15);
-
-
-                const requestsHead = [['Data', 'Motivo']];
-                const requestsBody = monthRequests.map(req => [req.date, req.text]);
-
-
-                doc.autoTable({
-                    head: requestsHead,
-                    body: requestsBody,
-                    startY: finalY + 18,
-                    theme: 'grid',
-                    headStyles: { fillColor: [44, 62, 80] },
-                });
+                doc.setFontSize(14); doc.text('Solicitações Autorizadas', 14, finalY + 15);
+                doc.autoTable({ head: [['Data', 'Motivo']], body: monthRequests.map(req => [req.date, req.text]), startY: finalY + 18, theme: 'grid', headStyles: { fillColor: [44, 62, 80] } });
                 finalY = doc.lastAutoTable.finalY;
             }
-            
-            doc.setFontSize(12);
-            doc.setFont('helvetica', 'bold');
-            doc.text(ui.monthlyBalance.textContent, 14, finalY + 10);
-            
+            doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text(ui.monthlyBalance.textContent, 14, finalY + 10);
             const occurrenceText = ui.occurrenceDetails.value;
-            doc.setFontSize(12);
-            doc.setFont('helvetica', 'bold');
-            doc.text('Registro de Ocorrências:', 14, finalY + 25);
-            doc.setLineWidth(0.2);
-            doc.setDrawColor(100); 
-            doc.rect(14, finalY + 28, 182, 30);
-
-
+            doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text('Registro de Ocorrências:', 14, finalY + 25);
+            doc.setLineWidth(0.2); doc.setDrawColor(100); doc.rect(14, finalY + 28, 182, 30);
             if (occurrenceText && occurrenceText.trim() !== '') {
-                doc.setFontSize(10);
-                doc.setFont('helvetica', 'normal');
-                const textLines = doc.splitTextToSize(occurrenceText, 178);
-                doc.text(textLines, 16, finalY + 33);
+                doc.setFontSize(10); doc.setFont('helvetica', 'normal');
+                doc.text(doc.splitTextToSize(occurrenceText, 178), 16, finalY + 33);
             }
-            
-            const safeUserName = userName.replace(/\s+/g, '_').toLowerCase();
-            const fileName = `relatorio_${safeUserName}_${String(month).padStart(2, '0')}_${year}.pdf`;
-            doc.save(fileName);
+            doc.save(`relatorio_${userName.replace(/\s+/g, '_').toLowerCase()}_${String(month).padStart(2, '0')}_${year}.pdf`);
         }
 
+        function renderUsersManagementTable(users) {
+            ui.usersManagementTableBody.innerHTML = '';
+            users.forEach(user => {
+                const userStatus = user.status || 'active';
+                const statusClass = userStatus === 'active' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800';
+                let actionButtonsHtml = userStatus === 'active' 
+                    ? `<button class="finalize-activity-btn font-medium text-red-600 hover:text-red-900" data-user-id="${user.id}">Encerrar Atividades</button>`
+                    : `<button class="toggle-status-btn font-medium text-green-600 hover:text-green-900" data-user-id="${user.id}" data-status="inactive">Reativar</button>`;
+                const row = document.createElement('tr');
+                row.innerHTML = `<td class="px-6 py-4">${user.name}</td><td class="px-6 py-4"><span class="px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${statusClass}">${userStatus.toUpperCase()}</span></td><td class="px-6 py-4 flex flex-wrap gap-4">${actionButtonsHtml}<button class="final-report-btn font-medium text-blue-600 hover:text-blue-900" data-user-id="${user.id}">Relatório Final</button></td>`;
+                ui.usersManagementTableBody.appendChild(row);
+            });
+            document.querySelectorAll('.toggle-status-btn, .finalize-activity-btn').forEach(button => {
+                button.addEventListener('click', (e) => {
+                    const userId = e.target.dataset.userId;
+                    if (e.target.classList.contains('finalize-activity-btn')) {
+                        const userName = allUsers.find(u => u.id === userId)?.name || 'este usuário';
+                        userToFinalize = userId; recordToDelete = null; requestToDelete = null;
+                        document.getElementById('delete-modal-title').textContent = 'Confirmar Encerramento';
+                        document.getElementById('delete-modal-text').textContent = `Deseja encerrar as atividades de ${userName}? O relatório final será baixado e o usuário desativado.`;
+                        document.getElementById('confirm-delete-btn').textContent = 'Encerrar';
+                        document.getElementById('confirm-delete-btn').className = 'py-2 px-4 rounded-md text-white bg-red-600 hover:bg-red-700';
+                        ui.deleteConfirmModal.style.display = 'flex';
+                    } else { toggleUserStatus(userId, e.target.dataset.status); }
+                });
+            });
+            document.querySelectorAll('.final-report-btn').forEach(button => button.addEventListener('click', (e) => generateFinalReport(e.target.dataset.userId)));
+        }
+
+        async function toggleUserStatus(userId, currentStatus) {
+            const newStatus = currentStatus === 'active' ? 'inactive' : 'active';
+            try { await updateDoc(doc(db, 'users', userId), { status: newStatus }); } catch (error) { console.error("Error updating user status:", error); }
+        }
+        
+        async function calculateFinalReportData(userId) {
+            const user = allUsers.find(u => u.id === userId);
+            if (!user) return null;
+
+            const entriesRef = collection(db, 'artifacts', appId, 'users', userId, 'time_entries');
+            const entriesSnapshot = await getDocs(query(entriesRef, orderBy("timestamp", "asc")));
+            const allEntries = entriesSnapshot.docs.map(doc => doc.data());
+
+            if (allEntries.length === 0) {
+                return { isDataAvailable: false, userName: user.name, detailedBody: [] };
+            }
+
+            const firstEntryDate = allEntries[0].timestamp.toDate();
+            const lastEntryDate = allEntries[allEntries.length - 1].timestamp.toDate();
+            const contractPeriod = `${firstEntryDate.toLocaleDateString('pt-BR')} a ${lastEntryDate.toLocaleDateString('pt-BR')}`;
+            let totalBalanceMs = 0, absenceDays = 0, totalWorkedMs = 0;
+            const detailedBody = [];
+
+            const entriesByDay = allEntries.reduce((acc, entry) => {
+                const date = entry.timestamp.toDate().toLocaleDateString('pt-BR');
+                if (!acc[date]) acc[date] = []; acc[date].push(entry);
+                return acc;
+            }, {});
+
+            const requestsRef = collection(db, `/artifacts/${appId}/requests`);
+            const q = query(requestsRef, where("userId", "==", userId), where("status", "==", "approved"));
+            const requestsSnapshot = await getDocs(q);
+            const justifiedDates = new Set(requestsSnapshot.docs.map(doc => doc.data().date));
+            let currentDate = new Date(firstEntryDate); currentDate.setHours(0, 0, 0, 0);
+            const finalDate = new Date(lastEntryDate); finalDate.setHours(0, 0, 0, 0);
+
+            while (currentDate <= finalDate) {
+                const dayIndex = currentDate.getDay();
+                const dateString = currentDate.toLocaleDateString('pt-BR');
+                const dayOfWeek = currentDate.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
+                const isWeekend = dayIndex === 0 || dayIndex === 6;
+                let ins = '---', outs = '---', dailyBalanceText = '---';
+
+                if (isWeekend) {
+                    dailyBalanceText = 'Fim de Semana';
+                } else {
+                    const dayEntries = entriesByDay[dateString];
+                    const justification = justifiedDates.has(dateString);
+                    if (justification) {
+                        dailyBalanceText = 'Justificado'; 
+                    } else if (!dayEntries) {
+                        totalBalanceMs -= (6 * 3600 * 1000); absenceDays++; dailyBalanceText = 'Falta';
+                    } else if (dayEntries.length % 2 === 0) {
+                        let dailyWorkedMs = 0;
+                        const sortedEntries = dayEntries.sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
+                        for (let i = 0; i < sortedEntries.length; i += 2) {
+                            if (sortedEntries[i].type === 'in' && sortedEntries[i+1] && sortedEntries[i+1].type === 'out') {
+                                dailyWorkedMs += sortedEntries[i+1].timestamp.toMillis() - sortedEntries[i].timestamp.toMillis();
+                            }
+                        }
+                        totalWorkedMs += dailyWorkedMs;
+                        const dailyBalanceMs = dailyWorkedMs - (6 * 3600 * 1000);
+                        if (Math.abs(dailyBalanceMs) > (15 * 60 * 1000)) { totalBalanceMs += dailyBalanceMs; }
+                        dailyBalanceText = Math.abs(dailyBalanceMs) <= (15 * 60 * 1000) ? '00:00' : formatMilliseconds(dailyBalanceMs, true);
+                        ins = sortedEntries.filter(e => e.type === 'in').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).join(', ');
+                        outs = sortedEntries.filter(e => e.type === 'out').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).join(', ');
+                    } else { dailyBalanceText = 'Batida Ímpar'; }
+                }
+                detailedBody.push([dateString, dayOfWeek, ins, outs, dailyBalanceText]);
+                currentDate.setDate(currentDate.getDate() + 1);
+            }
+            return { isDataAvailable: true, userName: user.name, contractPeriod, totalWorked: formatMilliseconds(totalWorkedMs), absenceDays, finalBalance: formatMilliseconds(totalBalanceMs, true), detailedBody };
+        }
+
+        async function generateFinalReport(userId) {
+            ui.finalReportContent.innerHTML = `<div class="loader mx-auto"></div><p class="text-center mt-2">Calculando relatório...</p>`;
+            ui.finalReportModal.style.display = 'flex';
+            const reportData = await calculateFinalReportData(userId);
+            if (!reportData || !reportData.isDataAvailable) {
+                 ui.finalReportContent.innerHTML = `<p><strong>Funcionário:</strong> ${reportData.userName}</p><p>Nenhum registro de ponto encontrado.</p>`;
+                 ui.downloadFinalPdfBtn.classList.add('hidden');
+                 return;
+            }
+            ui.finalReportContent.innerHTML = `<p><strong>Funcionário:</strong> ${reportData.userName}</p><p><strong>Período:</strong> ${reportData.contractPeriod}</p><p><strong>Total de Horas Trabalhadas (Bruto):</strong> ${reportData.totalWorked}</p><p><strong>Dias de Falta (não justificados):</strong> ${reportData.absenceDays}</p><p class="text-lg font-bold mt-2"><strong>Saldo Final de Horas:</strong> ${reportData.finalBalance}</p>`;
+            ui.downloadFinalPdfBtn.classList.remove('hidden');
+            const newDownloadBtn = ui.downloadFinalPdfBtn.cloneNode(true);
+            ui.downloadFinalPdfBtn.parentNode.replaceChild(newDownloadBtn, ui.downloadFinalPdfBtn);
+            ui.downloadFinalPdfBtn = newDownloadBtn;
+            ui.downloadFinalPdfBtn.addEventListener('click', () => generateFinalReportPdf(reportData));
+        }
+        
+        async function finalizeUserActivity(userId) {
+            try {
+                const reportData = await calculateFinalReportData(userId);
+                if (reportData && reportData.isDataAvailable) { generateFinalReportPdf(reportData); }
+                await updateDoc(doc(db, 'users', userId), { status: 'inactive' });
+            } catch (error) { console.error("Erro ao encerrar atividades:", error); }
+        }
+
+        function generateFinalReportPdf(reportData) {
+            const { jsPDF } = window.jspdf; const doc = new jsPDF();
+            doc.setFontSize(18); doc.text(`Relatório Final de Horas - ${reportData.userName}`, 14, 22);
+            doc.setFontSize(12); doc.text(`Período do Contrato: ${reportData.contractPeriod}`, 14, 30);
+            
+            let finalY = 40;
+            doc.setFont('helvetica', 'normal');
+            doc.text(`Total de Horas Trabalhadas (Bruto): ${reportData.totalWorked}`, 14, finalY);
+            doc.text(`Dias de Falta (não justificados): ${reportData.absenceDays}`, 14, finalY + 8);
+            doc.setFontSize(14); doc.setFont('helvetica', 'bold');
+            doc.text(`Saldo Final de Horas: ${reportData.finalBalance}`, 14, finalY + 18);
+            finalY += 30;
+
+            doc.setFontSize(12); doc.setFont('helvetica', 'bold');
+            doc.text('Registros de Ponto Detalhados', 14, finalY);
+            finalY += 3;
+            
+            const head = [['Data', 'Dia', 'Entradas', 'Saídas', 'Saldo']];
+            doc.autoTable({ head, body: reportData.detailedBody, startY: finalY, theme: 'striped', headStyles: { fillColor: [22, 160, 133] } });
+            
+            doc.save(`relatorio_final_${reportData.userName.replace(/\s+/g, '_').toLowerCase()}.pdf`);
+        }
 
         ui.downloadPdfBtn.addEventListener('click', generatePdf);
         ui.loginForm.addEventListener('submit', async (e) => { e.preventDefault(); ui.loginError.textContent = ''; try { await signInWithEmailAndPassword(auth, ui.loginForm.email.value, ui.loginForm.password.value); } catch (error) { ui.loginError.textContent = "E-mail ou senha inválidos."; } });
@@ -1080,29 +1024,22 @@
         ui.forgot.link.addEventListener('click', (e) => { e.preventDefault(); ui.forgot.modal.style.display = 'flex'; });
         ui.forgot.close.addEventListener('click', () => { ui.forgot.modal.style.display = 'none'; ui.forgot.msg.textContent = ''; });
         ui.forgot.form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            ui.forgot.msg.textContent = 'Enviando...';
+            e.preventDefault(); ui.forgot.msg.textContent = 'Enviando...';
             try {
                 await sendPasswordResetEmail(auth, ui.forgot.email.value);
-                ui.forgot.msg.textContent = 'Link de redefinição enviado para o seu e-mail!';
-                ui.forgot.msg.className = 'text-sm mt-4 text-center text-green-600';
+                ui.forgot.msg.textContent = 'Link de redefinição enviado!'; ui.forgot.msg.className = 'text-sm mt-4 text-center text-green-600';
             } catch (error) {
-                ui.forgot.msg.textContent = 'Erro ao enviar e-mail. Verifique o endereço digitado.';
-                 ui.forgot.msg.className = 'text-sm mt-4 text-center text-red-600';
+                ui.forgot.msg.textContent = 'Erro ao enviar. Verifique o e-mail.'; ui.forgot.msg.className = 'text-sm mt-4 text-center text-red-600';
             }
         });
         
         ui.saveJustifyBtn.addEventListener('click', saveJustification);
-        ui.cancelJustifyBtn.addEventListener('click', () => {
-            ui.justifyModal.style.display = 'none';
-            dayToJustify = null;
-        });
+        ui.cancelJustifyBtn.addEventListener('click', () => { ui.justifyModal.style.display = 'none'; dayToJustify = null; });
+        ui.closeFinalReportModal.addEventListener('click', () => { ui.finalReportModal.style.display = 'none'; });
 
         document.getElementById('header-date').textContent = new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         const today = new Date();
-        const currentMonth = today.toISOString().substring(0, 7);
-        document.getElementById('month-selector').value = currentMonth;
-
+        document.getElementById('month-selector').value = today.toISOString().substring(0, 7);
 
     </script>
 </body>
