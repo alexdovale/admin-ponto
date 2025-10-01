@@ -73,6 +73,31 @@
                             <button id="download-pdf-btn" class="py-2 px-4 rounded-md text-white bg-blue-600 hover:bg-blue-700 hidden">Baixar PDF</button>
                         </div>
                     </div>
+
+                    <div class="p-4 border border-gray-200 rounded-lg">
+                        <h3 class="text-lg font-medium mb-4">Lançamento Rápido de Período</h3>
+                        <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
+                            <div>
+                                <label for="quick-entry-start-date" class="block text-sm font-medium text-gray-700">Data de Início:</label>
+                                <input type="date" id="quick-entry-start-date" class="mt-1 p-2 border rounded-md w-full">
+                            </div>
+                            <div>
+                                <label for="quick-entry-end-date" class="block text-sm font-medium text-gray-700">Data de Fim:</label>
+                                <input type="date" id="quick-entry-end-date" class="mt-1 p-2 border rounded-md w-full">
+                            </div>
+                            <div>
+                                <label for="quick-entry-type" class="block text-sm font-medium text-gray-700">Tipo:</label>
+                                <select id="quick-entry-type" class="mt-1 p-2 border rounded-md w-full">
+                                    <option value="Férias">Férias</option>
+                                    <option value="Licença Médica">Licença Médica</option>
+                                    <option value="Licença Maternidade/Paternidade">Licença Maternidade/Paternidade</option>
+                                    <option value="Outra Licença">Outra Licença</option>
+                                </select>
+                            </div>
+                            <button id="apply-quick-entry-btn" class="py-2 px-4 rounded-md text-white bg-indigo-600 hover:bg-indigo-700 h-10">Aplicar</button>
+                        </div>
+                        <p id="quick-entry-status" class="text-sm mt-4 text-center"></p>
+                     </div>
                     
                     <div id="reports-container">
                         <h3 id="report-title" class="text-lg font-medium">Histórico de Registros</h3>
@@ -121,6 +146,14 @@
 
                     <div class="mt-8">
                         <h3 class="text-lg font-medium">Gerenciamento de Usuários</h3>
+                        <div class="my-4 flex flex-wrap gap-4 items-center p-4 bg-gray-50 rounded-lg">
+                            <input type="text" id="user-search-filter" class="p-2 border rounded-md flex-grow" placeholder="Pesquisar por nome...">
+                            <select id="user-status-filter" class="p-2 border rounded-md">
+                                <option value="all">Todos os Status</option>
+                                <option value="active" selected>Ativos</option>
+                                <option value="inactive">Inativos</option>
+                            </select>
+                        </div>
                         <div class="mt-4 overflow-x-auto">
                             <table class="min-w-full divide-y divide-gray-200">
                                 <thead class="bg-gray-50">
@@ -179,7 +212,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, sendPasswordResetEmail } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, doc, getDoc, Timestamp, updateDoc, query, orderBy, getDocs, where, deleteDoc, setDoc, addDoc } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, collection, onSnapshot, doc, getDoc, Timestamp, updateDoc, query, orderBy, getDocs, where, deleteDoc, setDoc, addDoc, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
         
         const appId = "1:582643132528:web:2d489ae3c23786152a2cb5";
         const firebaseConfig = {
@@ -252,12 +285,20 @@
             requestStartDateFilter: document.getElementById('request-start-date-filter'),
             requestEndDateFilter: document.getElementById('request-end-date-filter'),
             requestSearchFilter: document.getElementById('request-search-filter'),
+            userSearchFilter: document.getElementById('user-search-filter'),
+            userStatusFilter: document.getElementById('user-status-filter'),
+            quickEntryStartDate: document.getElementById('quick-entry-start-date'),
+            quickEntryEndDate: document.getElementById('quick-entry-end-date'),
+            quickEntryType: document.getElementById('quick-entry-type'),
+            applyQuickEntryBtn: document.getElementById('apply-quick-entry-btn'),
+            quickEntryStatus: document.getElementById('quick-entry-status'),
         };
 
 
         let unsubscribe = { users: null, requests: null, entries: null };
         let allUsers = [];
         let allRequests = [];
+        let filteredEmployees = [];
         let recordToEdit = null;
         let recordToDelete = null;
         let requestToDelete = null;
@@ -300,10 +341,10 @@
             const usersRef = collection(db, 'users');
             unsubscribe.users = onSnapshot(usersRef, (usersSnapshot) => {
                 allUsers = usersSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-                const filteredEmployees = allUsers.filter(u => u.role === 'employee' && (role === 'general_manager' || (role === 'nupap_manager' && u.team === 'nupap') || (role === 'nudof_manager' && u.team === 'nudof')));
+                filteredEmployees = allUsers.filter(u => u.role === 'employee' && (role === 'general_manager' || (role === 'nupap_manager' && u.team === 'nupap') || (role === 'nudof_manager' && u.team === 'nudof')));
 
-                renderUserDropdown(filteredEmployees.filter(u => u.status !== 'inactive'));
-                renderUsersManagementTable(filteredEmployees);
+                renderUserDropdown(filteredEmployees.filter(u => (u.status || 'active') === 'active'));
+                filterAndRenderUsersManagementTable();
                 setupRequestFilters(filteredEmployees);
                 
                 if (unsubscribe.requests) unsubscribe.requests();
@@ -714,7 +755,7 @@
         ui.cancelEditBtn.addEventListener('click', () => { recordToEdit = null; ui.editModal.style.display = 'none'; });
 
         function setupRequestFilters(users) {
-            ui.requestUserFilter.innerHTML = '<option value="">Todos os Funcionários</option>';
+            ui.requestUserFilter.innerHTML = '<option value="">Todos os Funcionários</option><option value="none">Nenhum</option>';
             users.forEach(user => {
                 const option = document.createElement('option');
                 option.value = user.id;
@@ -736,7 +777,9 @@
 
             let filteredRequests = allRequests;
 
-            if (selectedUserId) {
+            if (selectedUserId === 'none') {
+                filteredRequests = [];
+            } else if (selectedUserId) {
                 filteredRequests = filteredRequests.filter(req => req.userId === selectedUserId);
             }
             if (startDate) {
@@ -864,6 +907,20 @@
                 doc.text(doc.splitTextToSize(occurrenceText, 178), 16, finalY + 33);
             }
             doc.save(`relatorio_${userName.replace(/\s+/g, '_').toLowerCase()}_${String(month).padStart(2, '0')}_${year}.pdf`);
+        }
+
+        function filterAndRenderUsersManagementTable() {
+            const searchTerm = ui.userSearchFilter.value.toLowerCase();
+            const status = ui.userStatusFilter.value;
+            let usersToRender = filteredEmployees;
+
+            if (searchTerm) {
+                usersToRender = usersToRender.filter(user => user.name.toLowerCase().includes(searchTerm));
+            }
+            if (status !== 'all') {
+                usersToRender = usersToRender.filter(user => (user.status || 'active') === status);
+            }
+            renderUsersManagementTable(usersToRender);
         }
 
         function renderUsersManagementTable(users) {
@@ -1018,9 +1075,11 @@
             doc.text(`Dias de Falta (não justificados): ${reportData.absenceDays}`, 14, finalY + 8);
             doc.setFontSize(14); doc.setFont('helvetica', 'bold');
             doc.text(`Saldo Final de Horas: ${reportData.finalBalance}`, 14, finalY + 18);
-            finalY = finalY + 28;
+            finalY = finalY + 30;
 
             if (reportData.approvedRequests && reportData.approvedRequests.length > 0) {
+                doc.addPage();
+                finalY = 20;
                 doc.setFontSize(12);
                 doc.setFont('helvetica', 'bold');
                 doc.text('Solicitações Autorizadas', 14, finalY);
@@ -1038,6 +1097,8 @@
                 finalY = doc.lastAutoTable.finalY + 10;
             }
 
+            doc.addPage();
+            finalY = 20;
             doc.setFontSize(12); doc.setFont('helvetica', 'bold');
             doc.text('Registros de Ponto Detalhados', 14, finalY);
             
@@ -1072,6 +1133,76 @@
         ui.saveJustifyBtn.addEventListener('click', saveJustification);
         ui.cancelJustifyBtn.addEventListener('click', () => { ui.justifyModal.style.display = 'none'; dayToJustify = null; });
         ui.closeFinalReportModal.addEventListener('click', () => { ui.finalReportModal.style.display = 'none'; });
+        ui.userSearchFilter.addEventListener('keyup', filterAndRenderUsersManagementTable);
+        ui.userStatusFilter.addEventListener('change', filterAndRenderUsersManagementTable);
+        ui.applyQuickEntryBtn.addEventListener('click', applyQuickEntry);
+
+        async function applyQuickEntry() {
+            const userId = ui.userDropdown.value;
+            const startDateStr = ui.quickEntryStartDate.value;
+            const endDateStr = ui.quickEntryEndDate.value;
+            const type = ui.quickEntryType.value;
+            const statusEl = ui.quickEntryStatus;
+
+            if (!userId || !startDateStr || !endDateStr) {
+                statusEl.textContent = 'Por favor, selecione um funcionário e o período completo.';
+                statusEl.className = 'text-sm mt-4 text-center text-red-600';
+                return;
+            }
+
+            const startDate = new Date(startDateStr + 'T00:00:00');
+            const endDate = new Date(endDateStr + 'T00:00:00');
+
+            if (startDate > endDate) {
+                statusEl.textContent = 'A data de início não pode ser posterior à data de fim.';
+                statusEl.className = 'text-sm mt-4 text-center text-red-600';
+                return;
+            }
+            
+            const user = allUsers.find(u => u.id === userId);
+            if (!user) {
+                statusEl.textContent = 'Funcionário não encontrado.';
+                statusEl.className = 'text-sm mt-4 text-center text-red-600';
+                return;
+            }
+
+            statusEl.textContent = 'Aplicando...';
+            statusEl.className = 'text-sm mt-4 text-center text-gray-600';
+            ui.applyQuickEntryBtn.disabled = true;
+
+            try {
+                const batch = writeBatch(db);
+                let currentDate = new Date(startDate);
+                while (currentDate <= endDate) {
+                    const dayIndex = currentDate.getDay();
+                    if (dayIndex !== 0 && dayIndex !== 6) { // Not Sunday or Saturday
+                        const newRequest = {
+                            userId: userId,
+                            userName: user.name,
+                            date: currentDate.toLocaleDateString('pt-BR'),
+                            text: type,
+                            status: 'approved',
+                            createdAt: Timestamp.now()
+                        };
+                        const newReqRef = doc(collection(db, `artifacts/${appId}/requests`));
+                        batch.set(newReqRef, newRequest);
+                    }
+                    currentDate.setDate(currentDate.getDate() + 1);
+                }
+
+                await batch.commit();
+                statusEl.textContent = 'Período aplicado com sucesso!';
+                statusEl.className = 'text-sm mt-4 text-center text-green-600';
+                ui.generateReportBtn.click(); // Refresh report
+            } catch (error) {
+                console.error("Erro ao aplicar período:", error);
+                statusEl.textContent = 'Erro ao salvar. Tente novamente.';
+                statusEl.className = 'text-sm mt-4 text-center text-red-600';
+            } finally {
+                ui.applyQuickEntryBtn.disabled = false;
+                setTimeout(() => { statusEl.textContent = ''; }, 4000);
+            }
+        }
 
         document.getElementById('header-date').textContent = new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         const today = new Date();
