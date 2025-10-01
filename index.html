@@ -755,7 +755,7 @@
         ui.cancelEditBtn.addEventListener('click', () => { recordToEdit = null; ui.editModal.style.display = 'none'; });
 
         function setupRequestFilters(users) {
-            ui.requestUserFilter.innerHTML = '<option value="">Todos os Funcionários</option><option value="none">Nenhum</option>';
+            ui.requestUserFilter.innerHTML = '<option value="none" selected>Nenhum</option><option value="">Todos os Funcionários</option>';
             users.forEach(user => {
                 const option = document.createElement('option');
                 option.value = user.id;
@@ -1078,8 +1078,6 @@
             finalY = finalY + 30;
 
             if (reportData.approvedRequests && reportData.approvedRequests.length > 0) {
-                doc.addPage();
-                finalY = 20;
                 doc.setFontSize(12);
                 doc.setFont('helvetica', 'bold');
                 doc.text('Solicitações Autorizadas', 14, finalY);
@@ -1097,8 +1095,6 @@
                 finalY = doc.lastAutoTable.finalY + 10;
             }
 
-            doc.addPage();
-            finalY = 20;
             doc.setFontSize(12); doc.setFont('helvetica', 'bold');
             doc.text('Registros de Ponto Detalhados', 14, finalY);
             
