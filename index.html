@@ -97,7 +97,7 @@
                             <button id="apply-quick-entry-btn" class="py-2 px-4 rounded-md text-white bg-indigo-600 hover:bg-indigo-700 h-10">Aplicar</button>
                         </div>
                         <p id="quick-entry-status" class="text-sm mt-4 text-center"></p>
-                     </div>
+                    </div>
                     
                     <div id="reports-container">
                         <h3 id="report-title" class="text-lg font-medium">Histórico de Registros</h3>
@@ -189,7 +189,30 @@
     <div id="delete-confirm-modal" class="modal"><div class="modal-content"><h3 id="delete-modal-title" class="text-lg font-medium mb-4">Confirmar Exclusão</h3><p id="delete-modal-text" class="text-sm text-gray-600 mb-4"></p><div class="flex justify-end gap-4"><button id="cancel-delete-btn" class="py-2 px-4 rounded-md text-gray-700 bg-gray-200 hover:bg-gray-300">Cancelar</button><button id="confirm-delete-btn" class="py-2 px-4 rounded-md text-white bg-red-600 hover:bg-red-700">Apagar</button></div></div></div>
     <div id="edit-modal" class="modal"><div class="modal-content"><h3 class="text-lg font-medium mb-4">Editar Registro de Ponto</h3><div class="mb-4"><label for="edit-time-input" class="block text-sm font-medium text-gray-700 mb-1">Horário:</label><input type="time" id="edit-time-input" class="w-full px-3 py-2 border rounded-md"></div><div class="flex justify-end gap-4"><button id="cancel-edit-btn" class="py-2 px-4 rounded-md text-gray-700 bg-gray-200 hover:bg-gray-300">Cancelar</button><button id="save-edit-btn" class="py-2 px-4 rounded-md text-white bg-green-600 hover:bg-green-700">Salvar</button></div></div></div>
     <div id="add-entry-modal" class="modal"><div class="modal-content"><h3 class="text-lg font-medium mb-4">Adicionar/Editar Batidas do Dia</h3><p id="add-entry-date" class="text-sm font-bold mb-4 text-gray-700"></p><div class="grid grid-cols-2 gap-4"><div><label for="add-entry-in-1" class="block text-sm font-medium text-gray-700 mb-1">Entrada:</label><input type="time" id="add-entry-in-1" class="w-full px-3 py-2 border rounded-md"></div><div><label for="add-entry-out-1" class="block text-sm font-medium text-gray-700 mb-1">Saída:</label><input type="time" id="add-entry-out-1" class="w-full px-3 py-2 border rounded-md"></div></div><p id="add-entry-message" class="text-sm mt-4 text-center"></p><div class="flex justify-end gap-4 mt-6"><button id="cancel-add-btn" class="py-2 px-4 rounded-md text-gray-700 bg-gray-200 hover:bg-gray-300">Cancelar</button><button id="save-add-btn" class="py-2 px-4 rounded-md text-white bg-green-600 hover:bg-green-700">Salvar</button></div></div></div>
-    <div id="justify-modal" class="modal"><div class="modal-content"><h3 class="text-lg font-medium mb-4">Justificar/Abonar Dia</h3><p id="justify-date" class="text-sm font-bold mb-4 text-gray-700"></p><div><label for="justify-reason" class="block text-sm font-medium text-gray-700 mb-1">Motivo:</label><input type="text" id="justify-reason" class="w-full px-3 py-2 border rounded-md" placeholder="Ex: Feriado, Atestado Médico..."></div><p id="justify-message" class="text-sm mt-4 text-center"></p><div class="flex justify-end gap-4 mt-6"><button id="cancel-justify-btn" class="py-2 px-4 rounded-md text-gray-700 bg-gray-200 hover:bg-gray-300">Cancelar</button><button id="save-justify-btn" class="py-2 px-4 rounded-md text-white bg-green-600 hover:bg-green-700">Salvar Justificativa</button></div></div></div>
+    
+    <!-- MODAL DE JUSTIFICATIVA ATUALIZADO -->
+    <div id="justify-modal" class="modal">
+        <div class="modal-content">
+            <h3 class="text-lg font-medium mb-4">Justificar/Abonar Dia</h3>
+            <p id="justify-date" class="text-sm font-bold mb-4 text-gray-700"></p>
+            <div class="space-y-4">
+                <div>
+                    <label for="justify-reason" class="block text-sm font-medium text-gray-700 mb-1">Motivo / Descrição:</label>
+                    <input type="text" id="justify-reason" class="w-full px-3 py-2 border rounded-md" placeholder="Ex: Feriado, Atestado Médico, Banco de Horas...">
+                </div>
+                <div>
+                    <label for="justify-hours" class="block text-sm font-medium text-gray-700 mb-1">Horas a Abonar (opcional):</label>
+                    <input type="time" id="justify-hours" class="w-full px-3 py-2 border rounded-md">
+                    <p class="text-xs text-gray-500 mt-1">Deixe em branco para apenas justificar sem abonar horas. Para abonar o dia inteiro, preencha com 06:00.</p>
+                </div>
+            </div>
+            <p id="justify-message" class="text-sm mt-4 text-center"></p>
+            <div class="flex justify-end gap-4 mt-6">
+                <button id="cancel-justify-btn" class="py-2 px-4 rounded-md text-gray-700 bg-gray-200 hover:bg-gray-300">Cancelar</button>
+                <button id="save-justify-btn" class="py-2 px-4 rounded-md text-white bg-green-600 hover:bg-green-700">Salvar Justificativa</button>
+            </div>
+        </div>
+    </div>
     
     <div id="final-report-modal" class="modal">
         <div class="modal-content max-w-3xl w-full">
@@ -273,6 +296,7 @@
             justifyModal: document.getElementById('justify-modal'),
             justifyDate: document.getElementById('justify-date'),
             justifyReason: document.getElementById('justify-reason'),
+            justifyHours: document.getElementById('justify-hours'), // Novo campo
             justifyMessage: document.getElementById('justify-message'),
             cancelJustifyBtn: document.getElementById('cancel-justify-btn'),
             saveJustifyBtn: document.getElementById('save-justify-btn'),
@@ -419,6 +443,7 @@
             ui.reportTableHead.innerHTML = `<tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dia da Semana</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Entradas</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saídas</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saldo do Dia</th></tr>`;
             ui.noReportMessage.classList.add('hidden');
             
+            // Lógica de abono e justificativa atualizada
             const requestsRef = collection(db, `/artifacts/${appId}/requests`);
             const q = query(requestsRef, where("userId", "==", userId), where("status", "==", "approved"));
             const requestsSnapshot = await getDocs(q);
@@ -429,7 +454,7 @@
                     const [reqDay, reqMonth, reqYear] = req.date.split('/');
                     if (parseInt(reqYear, 10) === year && parseInt(reqMonth, 10) === month) {
                         const lookupDate = new Date(parseInt(reqYear, 10), parseInt(reqMonth, 10) - 1, parseInt(reqDay, 10)).toLocaleDateString('pt-BR');
-                        approvedRequests[lookupDate] = req.text || 'Abonado';
+                        approvedRequests[lookupDate] = req; // Armazena o objeto completo da solicitação
                     }
                 }
             });
@@ -443,6 +468,7 @@
 
             let totalMonthlyBalanceMs = 0;
             const daysInMonth = new Date(year, month, 0).getDate();
+            const requiredWorkMs = 6 * 3600 * 1000; // 6 horas em milissegundos
 
             for (let day = 1; day <= daysInMonth; day++) {
                 const currentDate = new Date(year, month - 1, day);
@@ -450,8 +476,13 @@
                 const dayOfWeek = currentDate.toLocaleDateString('pt-BR', { weekday: 'short' });
                 const dayIndex = currentDate.getDay();
                 const isWeekend = dayIndex === 0 || dayIndex === 6;
-                let ins = '---', outs = '---', dailyBalanceText = '---', dailyBalanceClass = 'text-gray-700';
                 const isFutureDay = currentDate > today && currentDate.setHours(0,0,0,0) > today.setHours(0,0,0,0);
+                
+                const dayEntries = entriesByDay[dateString] || [];
+                const ins = dayEntries.length > 0 ? dayEntries.filter(e => e.type === 'in').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).sort().join(', ') : '---';
+                const outs = dayEntries.length > 0 ? dayEntries.filter(e => e.type === 'out').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).sort().join(', ') : '---';
+
+                let dailyBalanceText = '---', dailyBalanceClass = 'text-gray-700';
 
                 if (isWeekend) {
                     dailyBalanceText = 'Fim de Semana';
@@ -459,34 +490,47 @@
                 } else if (isFutureDay) {
                     dailyBalanceText = '---';
                 } else {
-                    const dayEntries = entriesByDay[dateString] || [];
                     const justification = approvedRequests[dateString];
-                    ins = dayEntries.length > 0 ? dayEntries.filter(e => e.type === 'in').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).join(', ') : '---';
-                    outs = dayEntries.length > 0 ? dayEntries.filter(e => e.type === 'out').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).join(', ') : '---';
+                    let dailyWorkedMs = 0;
+                    let dailyBalanceMs = 0;
+
+                    // 1. Calcula as horas trabalhadas a partir das batidas
+                    if (dayEntries.length > 0 && dayEntries.length % 2 === 0) {
+                         const sortedEntries = dayEntries.sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
+                         for (let i = 0; i < sortedEntries.length; i += 2) {
+                             if (sortedEntries[i].type === 'in' && sortedEntries[i+1] && sortedEntries[i+1].type === 'out') {
+                                 dailyWorkedMs += sortedEntries[i+1].timestamp.toMillis() - sortedEntries[i].timestamp.toMillis();
+                             }
+                         }
+                    }
+                    
+                    // 2. Verifica e aplica a justificativa/abono
                     if (justification) {
-                        dailyBalanceText = justification;
+                        const abonoMs = (justification.abonoMinutes || 0) * 60 * 1000;
+                        const totalCreditedMs = dailyWorkedMs + abonoMs;
+                        dailyBalanceMs = totalCreditedMs - requiredWorkMs;
+                        
+                        const balanceStr = Math.abs(dailyBalanceMs) <= (15 * 60 * 1000) ? '00:00' : formatMilliseconds(dailyBalanceMs, true);
+                        dailyBalanceText = `${justification.text} (${balanceStr})`;
                         dailyBalanceClass = 'text-blue-600';
-                    } else if (dayEntries.length === 0) {
+
+                    } else if (dayEntries.length === 0) { // Falta
+                        dailyBalanceMs = -requiredWorkMs;
                         dailyBalanceText = 'Falta';
                         dailyBalanceClass = 'text-red-600 font-bold';
-                        totalMonthlyBalanceMs -= (6 * 3600 * 1000); 
-                    } else if (dayEntries.length % 2 !== 0) {
+                    } else if (dayEntries.length % 2 !== 0) { // Batida Ímpar
+                        dailyBalanceMs = 0; 
                         dailyBalanceText = 'Batida Ímpar';
                         dailyBalanceClass = 'text-orange-500 font-bold';
-                    } else {
-                        let dailyWorkedMs = 0;
-                        const sortedEntries = dayEntries.sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
-                        for (let i = 0; i < sortedEntries.length; i += 2) {
-                            if (sortedEntries[i].type === 'in' && sortedEntries[i+1] && sortedEntries[i+1].type === 'out') {
-                                dailyWorkedMs += sortedEntries[i+1].timestamp.toMillis() - sortedEntries[i].timestamp.toMillis();
-                            }
-                        }
-                        const dailyBalanceMs = dailyWorkedMs - (6 * 3600 * 1000);
-                        if (Math.abs(dailyBalanceMs) > (15 * 60 * 1000)) {
-                            totalMonthlyBalanceMs += dailyBalanceMs;
-                        }
+                    } else { // Dia normal de trabalho
+                        dailyBalanceMs = dailyWorkedMs - requiredWorkMs;
                         dailyBalanceText = Math.abs(dailyBalanceMs) <= (15 * 60 * 1000) ? '00:00' : formatMilliseconds(dailyBalanceMs, true);
                         dailyBalanceClass = dailyBalanceMs >= 0 ? 'text-green-600' : 'text-red-600';
+                    }
+                    
+                    // 3. Adiciona ao saldo mensal (com tolerância e sem contar dias de batida ímpar)
+                    if (dayEntries.length % 2 === 0 && Math.abs(dailyBalanceMs) > (15 * 60 * 1000)) {
+                        totalMonthlyBalanceMs += dailyBalanceMs;
                     }
                 }
                 const row = document.createElement('tr');
@@ -632,6 +676,7 @@
             ui.justifyDate.textContent = `Justificativa para: ${date.toLocaleDateString('pt-BR')}`;
             dayToJustify = { userId, date };
             ui.justifyReason.value = '';
+            ui.justifyHours.value = ''; // Limpa o campo de horas
             ui.justifyMessage.textContent = '';
             ui.justifyModal.style.display = 'flex';
         }
@@ -640,10 +685,20 @@
             if (!dayToJustify) return;
             const { userId, date } = dayToJustify;
             const reason = ui.justifyReason.value.trim();
+            const abonoTime = ui.justifyHours.value;
+
             if (!reason) {
                 ui.justifyMessage.textContent = 'O motivo é obrigatório.';
                 ui.justifyMessage.className = 'text-sm mt-4 text-center text-red-600';
                 return;
+            }
+
+            let abonoMinutes = 0;
+            if (abonoTime) {
+                const [hours, minutes] = abonoTime.split(':').map(Number);
+                if (!isNaN(hours) && !isNaN(minutes)) {
+                    abonoMinutes = hours * 60 + minutes;
+                }
             }
 
             const msgEl = ui.justifyMessage;
@@ -658,7 +713,16 @@
                 return;
             }
 
-            const newRequest = { userId: userId, userName: user.name, date: date.toLocaleDateString('pt-BR'), text: reason, status: 'approved', createdAt: Timestamp.now() };
+            const newRequest = { 
+                userId: userId, 
+                userName: user.name, 
+                date: date.toLocaleDateString('pt-BR'), 
+                text: reason, 
+                status: 'approved', 
+                createdAt: Timestamp.now(),
+                abonoMinutes: abonoMinutes > 0 ? abonoMinutes : null // Salva os minutos abonados
+            };
+
             try {
                 await addDoc(collection(db, `artifacts/${appId}/requests`), newRequest);
                 msgEl.textContent = "Justificativa salva com sucesso!";
@@ -666,7 +730,7 @@
                 setTimeout(() => {
                     ui.justifyModal.style.display = 'none'; dayToJustify = null; msgEl.textContent = '';
                     ui.saveJustifyBtn.disabled = false; ui.cancelJustifyBtn.disabled = false;
-                    ui.generateReportBtn.click();
+                    ui.generateReportBtn.click(); // Atualiza o relatório
                 }, 1500);
             } catch (error) {
                 console.error("Erro ao salvar justificativa:", error);
@@ -1178,7 +1242,8 @@
                             date: currentDate.toLocaleDateString('pt-BR'),
                             text: type,
                             status: 'approved',
-                            createdAt: Timestamp.now()
+                            createdAt: Timestamp.now(),
+                            abonoMinutes: 360 // Lançamento rápido sempre abona o dia inteiro (6h)
                         };
                         const newReqRef = doc(collection(db, `artifacts/${appId}/requests`));
                         batch.set(newReqRef, newRequest);
@@ -1207,4 +1272,3 @@
     </script>
 </body>
 </html>
-
