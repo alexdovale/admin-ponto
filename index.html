@@ -29,7 +29,6 @@
 </head>
 <body class="bg-gray-100">
 
-
     <main class="py-12 px-4">
         <div id="login-screen" class="w-full max-w-md">
             <div class="bg-white p-8 rounded-lg shadow-md space-y-6">
@@ -48,7 +47,6 @@
             </div>
         </div>
 
-
         <div id="app-screen" class="hidden w-full max-w-6xl">
             <div class="bg-white p-4 sm:p-8 rounded-lg shadow-md space-y-6">
                 <div class="flex flex-wrap justify-between items-center gap-4">
@@ -61,7 +59,6 @@
                     </div>
                     <button id="logout-button" class="px-4 py-2 text-sm font-medium text-green-600 bg-green-100 rounded-md hover:bg-green-200">Sair</button>
                 </div>
-
 
                 <div class="space-y-6">
                     <div>
@@ -119,7 +116,6 @@
                         </div>
                     </div>
 
-
                     <div class="mt-8">
                         <h3 class="text-lg font-medium">Solicitações de Funcionários</h3>
                         <div class="my-4 flex flex-wrap gap-4 items-center p-4 bg-gray-50 rounded-lg">
@@ -174,7 +170,6 @@
         </div>
     </main>
 
-
     <footer class="w-full bg-white p-6 shadow-inner">
         <div class="text-center text-sm text-gray-600">
             <p class="font-bold">Defensoria Pública do Estado do Rio de Janeiro</p>
@@ -227,10 +222,8 @@
         </div>
     </div>
 
-
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.23/jspdf.plugin.autotable.min.js"></script>
-
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
@@ -256,7 +249,6 @@
         } catch (e) { 
             document.body.innerHTML = `<div class="text-red-500 p-8">Erro de configuração do Firebase.</div>`; 
         }
-
 
         const ui = {
             loginScreen: document.getElementById('login-screen'), appScreen: document.getElementById('app-screen'),
@@ -318,7 +310,6 @@
             quickEntryStatus: document.getElementById('quick-entry-status'),
         };
 
-
         let unsubscribe = { users: null, requests: null, entries: null };
         let allUsers = [];
         let allRequests = [];
@@ -329,7 +320,6 @@
         let entryToAddOrEdit = null;
         let dayToJustify = null;
         let userToFinalize = null;
-
 
         onAuthStateChanged(auth, async (user) => {
             if (user) {
@@ -359,7 +349,6 @@
             }
         });
 
-
         function listenToFirebase(role, team) {
             if (unsubscribe.users) unsubscribe.users();
             const usersRef = collection(db, 'users');
@@ -379,7 +368,6 @@
                 });
             });
         }
-
 
         function renderUserDropdown(users) {
             ui.userDropdown.innerHTML = '<option value="">Selecione um funcionário</option>';
@@ -410,7 +398,6 @@
                 ui.noReportMessage.textContent = "Por favor, selecione um funcionário e um mês para gerar o relatório.";
             }
         });
-
 
         async function generateAndRenderMonthlyReport(userId, month, year) {
             ui.reportTitle.textContent = `Carregando dados...`;
@@ -484,55 +471,51 @@
 
                 let dailyBalanceText = '---', dailyBalanceClass = 'text-gray-700';
 
+                // START: Refactored logic
                 if (isWeekend) {
                     dailyBalanceText = 'Fim de Semana';
                     dailyBalanceClass = 'text-gray-500 italic';
                 } else if (isFutureDay) {
-                    dailyBalanceText = '---';
+                    // Mantém o padrão '---'
+                } else if (dayEntries.length % 2 !== 0) {
+                    dailyBalanceText = 'Batida Ímpar';
+                    dailyBalanceClass = 'text-orange-500 font-bold';
+                    // Saldo para este dia é 0 e não contribui para o total mensal.
                 } else {
-                    const justification = approvedRequests[dateString];
+                    // É um dia de trabalho válido (entradas pares ou zero)
                     let dailyWorkedMs = 0;
-                    let dailyBalanceMs = 0;
-
-                    // 1. Calcula as horas trabalhadas a partir das batidas
-                    if (dayEntries.length > 0 && dayEntries.length % 2 === 0) {
-                         const sortedEntries = dayEntries.sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
-                         for (let i = 0; i < sortedEntries.length; i += 2) {
-                             if (sortedEntries[i].type === 'in' && sortedEntries[i+1] && sortedEntries[i+1].type === 'out') {
-                                 dailyWorkedMs += sortedEntries[i+1].timestamp.toMillis() - sortedEntries[i].timestamp.toMillis();
-                             }
-                         }
+                    if (dayEntries.length > 0) {
+                        const sortedEntries = dayEntries.sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
+                        for (let i = 0; i < sortedEntries.length; i += 2) {
+                            if (sortedEntries[i].type === 'in' && sortedEntries[i+1] && sortedEntries[i+1].type === 'out') {
+                                dailyWorkedMs += sortedEntries[i+1].timestamp.toMillis() - sortedEntries[i].timestamp.toMillis();
+                            }
+                        }
                     }
+
+                    const justification = approvedRequests[dateString];
+                    const abonoMs = justification ? (justification.abonoMinutes || 0) * 60 * 1000 : 0;
                     
-                    // 2. Verifica e aplica a justificativa/abono
+                    const dailyBalanceMs = dailyWorkedMs + abonoMs - requiredWorkMs;
+
+                    if (Math.abs(dailyBalanceMs) > (15 * 60 * 1000)) {
+                        totalMonthlyBalanceMs += dailyBalanceMs;
+                    }
+
                     if (justification) {
-                        const abonoMs = (justification.abonoMinutes || 0) * 60 * 1000;
-                        const totalCreditedMs = dailyWorkedMs + abonoMs;
-                        dailyBalanceMs = totalCreditedMs - requiredWorkMs;
-                        
                         const balanceStr = Math.abs(dailyBalanceMs) <= (15 * 60 * 1000) ? '00:00' : formatMilliseconds(dailyBalanceMs, true);
                         dailyBalanceText = `${justification.text} (${balanceStr})`;
                         dailyBalanceClass = 'text-blue-600';
-
-                    } else if (dayEntries.length === 0) { // Falta
-                        dailyBalanceMs = -requiredWorkMs;
+                    } else if (dayEntries.length === 0) {
                         dailyBalanceText = 'Falta';
                         dailyBalanceClass = 'text-red-600 font-bold';
-                    } else if (dayEntries.length % 2 !== 0) { // Batida Ímpar
-                        dailyBalanceMs = 0; 
-                        dailyBalanceText = 'Batida Ímpar';
-                        dailyBalanceClass = 'text-orange-500 font-bold';
-                    } else { // Dia normal de trabalho
-                        dailyBalanceMs = dailyWorkedMs - requiredWorkMs;
+                    } else {
                         dailyBalanceText = Math.abs(dailyBalanceMs) <= (15 * 60 * 1000) ? '00:00' : formatMilliseconds(dailyBalanceMs, true);
                         dailyBalanceClass = dailyBalanceMs >= 0 ? 'text-green-600' : 'text-red-600';
                     }
-                    
-                    // 3. Adiciona ao saldo mensal (com tolerância e sem contar dias de batida ímpar)
-                    if (dayEntries.length % 2 === 0 && Math.abs(dailyBalanceMs) > (15 * 60 * 1000)) {
-                        totalMonthlyBalanceMs += dailyBalanceMs;
-                    }
                 }
+                // END: Refactored logic
+
                 const row = document.createElement('tr');
                 row.innerHTML = `<td class="px-6 py-4">${dateString}</td><td class="px-6 py-4 capitalize">${dayOfWeek.replace('.','')}</td><td class="px-6 py-4">${ins}</td><td class="px-6 py-4">${outs}</td><td class="px-6 py-4 font-medium ${dailyBalanceClass}">${dailyBalanceText}</td>`;
                 ui.reportTableBody.appendChild(row);
