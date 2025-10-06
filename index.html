@@ -209,6 +209,32 @@
         </div>
     </div>
     
+    <div id="request-action-modal" class="modal">
+        <div class="modal-content">
+            <h3 class="text-lg font-medium mb-4">Analisar Solicitação</h3>
+            <div class="space-y-4 text-sm">
+                <p><strong>Funcionário:</strong> <span id="req-modal-user-name"></span></p>
+                <p><strong>Data:</strong> <span id="req-modal-date"></span></p>
+                <div>
+                    <p class="font-medium text-gray-700">Justificativa do Funcionário:</p>
+                    <p id="req-modal-text" class="mt-1 p-2 bg-gray-100 rounded-md"></p>
+                </div>
+                <div>
+                    <label for="req-modal-abono" class="block font-medium text-gray-700 mb-1">Abonar Horas/Minutos:</label>
+                    <input type="time" id="req-modal-abono" class="w-full px-3 py-2 border rounded-md">
+                    <p class="text-xs text-gray-500 mt-1">Deixe em branco para não abonar. 06:00 para abonar o dia todo.</p>
+                </div>
+            </div>
+            <p id="req-modal-message" class="text-sm mt-4 text-center"></p>
+            <div class="flex flex-wrap justify-end gap-2 mt-6">
+                <button id="cancel-req-action-btn" class="py-2 px-4 rounded-md text-gray-700 bg-gray-200 hover:bg-gray-300">Cancelar</button>
+                <button id="delete-req-action-btn" class="py-2 px-4 rounded-md text-white bg-red-600 hover:bg-red-700">Apagar</button>
+                <button id="decline-req-action-btn" class="py-2 px-4 rounded-md text-white bg-orange-600 hover:bg-orange-700">Recusar</button>
+                <button id="approve-req-action-btn" class="py-2 px-4 rounded-md text-white bg-green-600 hover:bg-green-700">Aprovar</button>
+            </div>
+        </div>
+    </div>
+
     <div id="final-report-modal" class="modal">
         <div class="modal-content max-w-3xl w-full">
             <span id="close-final-report-modal" class="float-right text-2xl font-bold cursor-pointer">&times;</span>
@@ -288,10 +314,20 @@
             justifyModal: document.getElementById('justify-modal'),
             justifyDate: document.getElementById('justify-date'),
             justifyReason: document.getElementById('justify-reason'),
-            justifyHours: document.getElementById('justify-hours'), // Novo campo
+            justifyHours: document.getElementById('justify-hours'),
             justifyMessage: document.getElementById('justify-message'),
             cancelJustifyBtn: document.getElementById('cancel-justify-btn'),
             saveJustifyBtn: document.getElementById('save-justify-btn'),
+            requestActionModal: document.getElementById('request-action-modal'),
+            reqModalUserName: document.getElementById('req-modal-user-name'),
+            reqModalDate: document.getElementById('req-modal-date'),
+            reqModalText: document.getElementById('req-modal-text'),
+            reqModalAbono: document.getElementById('req-modal-abono'),
+            reqModalMessage: document.getElementById('req-modal-message'),
+            cancelReqActionBtn: document.getElementById('cancel-req-action-btn'),
+            deleteReqActionBtn: document.getElementById('delete-req-action-btn'),
+            declineReqActionBtn: document.getElementById('decline-req-action-btn'),
+            approveReqActionBtn: document.getElementById('approve-req-action-btn'),
             usersManagementTableBody: document.getElementById('users-management-table-body'),
             finalReportModal: document.getElementById('final-report-modal'),
             finalReportContent: document.getElementById('final-report-content'),
@@ -320,6 +356,7 @@
         let entryToAddOrEdit = null;
         let dayToJustify = null;
         let userToFinalize = null;
+        let requestToAction = null;
 
         onAuthStateChanged(auth, async (user) => {
             if (user) {
@@ -470,7 +507,6 @@
 
                 let dailyBalanceText = '---', dailyBalanceClass = 'text-gray-700';
 
-                // *** START: LOGIC CORRECTION ***
                 if (isWeekend) {
                     dailyBalanceText = 'Fim de Semana';
                     dailyBalanceClass = 'text-gray-500 italic';
@@ -480,7 +516,6 @@
                     dailyBalanceText = 'Batida Ímpar';
                     dailyBalanceClass = 'text-orange-500 font-bold';
                 } else {
-                    // É um dia de trabalho válido (passado ou presente, com batidas pares ou zero)
                     let workedMs = 0;
                     if (dayEntries.length > 0) {
                         const sorted = dayEntries.sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
@@ -497,7 +532,6 @@
                     let balanceMs = 0;
 
                     if (justification) {
-                         // Se não houver horas trabalhadas e nenhum abono específico, a justificativa cobre o dia inteiro.
                         if (workedMs === 0 && creditedMs === 0) {
                             balanceMs = 0;
                         } else {
@@ -521,7 +555,6 @@
                         totalMonthlyBalanceMs += balanceMs;
                     }
                 }
-                // *** END: LOGIC CORRECTION ***
 
                 const row = document.createElement('tr');
                 row.innerHTML = `<td class="px-6 py-4">${dateString}</td><td class="px-6 py-4 capitalize">${dayOfWeek.replace('.','')}</td><td class="px-6 py-4">${ins}</td><td class="px-6 py-4">${outs}</td><td class="px-6 py-4 font-medium ${dailyBalanceClass}">${dailyBalanceText}</td>`;
@@ -601,6 +634,8 @@
                 acc[date].push(entry);
                 return acc;
             }, {});
+            
+            const userRequests = allRequests.filter(r => r.userId === userId);
 
             const daysInMonth = new Date(year, month, 0).getDate();
 
@@ -621,13 +656,34 @@
                 const outs = dayEntries.filter(e => e.type === 'out').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).sort().join(', ');
 
                 const row = document.createElement('tr');
-                const actionsHtml = isWeekend ? '---' : `<div class="flex gap-2"><button class="edit-day-btn text-blue-600 hover:text-blue-900" data-date="${currentDate.toISOString()}" data-user-id="${userId}">Editar</button><button class="justify-day-btn text-green-600 hover:text-green-900" data-date="${currentDate.toISOString()}" data-user-id="${userId}">Justificar</button></div>`;
+                
+                const requestForDay = userRequests.find(r => r.date === dateString);
+                let actionsHtml = '';
+
+                if (isWeekend) {
+                    actionsHtml = '---';
+                } else if (requestForDay) {
+                    const statusColors = { pending: 'text-yellow-500', approved: 'text-green-500', declined: 'text-red-500' };
+                    const iconColor = statusColors[requestForDay.status] || 'text-gray-500';
+                    actionsHtml = `<div class="flex gap-2 items-center">
+                        <button class="edit-day-btn text-blue-600 hover:text-blue-900" data-date="${currentDate.toISOString()}" data-user-id="${userId}">Editar</button>
+                        <button class="view-request-btn ${iconColor} hover:opacity-75 text-xl" title="Analisar Solicitação" data-request-id="${requestForDay.id}">&#9993;</button>
+                    </div>`;
+                } else {
+                    actionsHtml = `<div class="flex gap-2"><button class="edit-day-btn text-blue-600 hover:text-blue-900" data-date="${currentDate.toISOString()}" data-user-id="${userId}">Editar</button><button class="justify-day-btn text-green-600 hover:text-green-900" data-date="${currentDate.toISOString()}" data-user-id="${userId}">Justificar</button></div>`;
+                }
+
                 row.innerHTML = `<td class="px-6 py-4">${dateString}</td><td class="px-6 py-4 capitalize">${dayOfWeek.replace('.','')}</td><td class="px-6 py-4">${ins || '---'}</td><td class="px-6 py-4">${outs || '---'}</td><td class="px-6 py-4">${actionsHtml}</td>`;
                 ui.reportTableBody.appendChild(row);
             }
 
             document.querySelectorAll('.edit-day-btn').forEach(button => button.addEventListener('click', (e) => showAddEntryModal(e.target.dataset.date, e.target.dataset.userId)));
             document.querySelectorAll('.justify-day-btn').forEach(button => button.addEventListener('click', (e) => showJustifyModal(e.target.dataset.date, e.target.dataset.userId)));
+            document.querySelectorAll('.view-request-btn').forEach(button => button.addEventListener('click', (e) => {
+                const requestId = e.currentTarget.dataset.requestId;
+                const requestData = allRequests.find(r => r.id === requestId);
+                if (requestData) showRequestActionModal(requestData);
+            }));
         }
         
         async function showAddEntryModal(dateStr, userId) {
@@ -666,9 +722,27 @@
             ui.justifyDate.textContent = `Justificativa para: ${date.toLocaleDateString('pt-BR')}`;
             dayToJustify = { userId, date };
             ui.justifyReason.value = '';
-            ui.justifyHours.value = ''; // Limpa o campo de horas
+            ui.justifyHours.value = '';
             ui.justifyMessage.textContent = '';
             ui.justifyModal.style.display = 'flex';
+        }
+
+        function showRequestActionModal(request) {
+            requestToAction = request;
+            ui.reqModalUserName.textContent = request.userName;
+            ui.reqModalDate.textContent = request.date;
+            ui.reqModalText.textContent = request.text;
+            ui.reqModalMessage.textContent = '';
+
+            if (request.abonoMinutes) {
+                const hours = Math.floor(request.abonoMinutes / 60);
+                const minutes = request.abonoMinutes % 60;
+                ui.reqModalAbono.value = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+            } else {
+                ui.reqModalAbono.value = '';
+            }
+
+            ui.requestActionModal.style.display = 'flex';
         }
 
         async function saveJustification() {
@@ -710,7 +784,7 @@
                 text: reason, 
                 status: 'approved', 
                 createdAt: Timestamp.now(),
-                abonoMinutes: abonoMinutes > 0 ? abonoMinutes : null // Salva os minutos abonados
+                abonoMinutes: abonoMinutes > 0 ? abonoMinutes : null
             };
 
             try {
@@ -720,7 +794,7 @@
                 setTimeout(() => {
                     ui.justifyModal.style.display = 'none'; dayToJustify = null; msgEl.textContent = '';
                     ui.saveJustifyBtn.disabled = false; ui.cancelJustifyBtn.disabled = false;
-                    ui.generateReportBtn.click(); // Atualiza o relatório
+                    ui.generateReportBtn.click();
                 }, 1500);
             } catch (error) {
                 console.error("Erro ao salvar justificativa:", error);
@@ -879,8 +953,13 @@
             });
         }
 
-        async function updateRequestStatus(requestId, status) {
-            await updateDoc(doc(db, `/artifacts/${appId}/requests`, requestId), { status });
+        async function updateRequestStatus(requestId, status, abonoMinutes = null) {
+            const dataToUpdate = { status, abonoMinutes };
+            if(abonoMinutes === null) {
+                dataToUpdate.abonoMinutes = null;
+            }
+            await updateDoc(doc(db, `/artifacts/${appId}/requests`, requestId), dataToUpdate);
+            ui.generateReportBtn.click();
         }
 
         function formatMilliseconds(ms, showSign = false) {
@@ -1182,6 +1261,41 @@
         
         ui.saveJustifyBtn.addEventListener('click', saveJustification);
         ui.cancelJustifyBtn.addEventListener('click', () => { ui.justifyModal.style.display = 'none'; dayToJustify = null; });
+        
+        ui.approveReqActionBtn.addEventListener('click', async () => {
+            if (!requestToAction) return;
+            const abonoTime = ui.reqModalAbono.value;
+            let abonoMinutes = null;
+            if (abonoTime) {
+                const [hours, minutes] = abonoTime.split(':').map(Number);
+                if (!isNaN(hours) && !isNaN(minutes)) {
+                    abonoMinutes = hours * 60 + minutes;
+                }
+            }
+            await updateRequestStatus(requestToAction.id, 'approved', abonoMinutes);
+            ui.requestActionModal.style.display = 'none';
+        });
+
+        ui.declineReqActionBtn.addEventListener('click', async () => {
+            if (!requestToAction) return;
+            await updateRequestStatus(requestToAction.id, 'declined', null);
+            ui.requestActionModal.style.display = 'none';
+        });
+        
+        ui.deleteReqActionBtn.addEventListener('click', () => {
+             if (!requestToAction) return;
+             requestToDelete = requestToAction.id;
+             document.getElementById('delete-modal-title').textContent = 'Confirmar Exclusão de Solicitação';
+             document.getElementById('delete-modal-text').textContent = 'Tem certeza que deseja apagar esta solicitação? Esta ação não pode ser desfeita.';
+             ui.deleteConfirmModal.style.display = 'flex';
+             ui.requestActionModal.style.display = 'none';
+        });
+
+        ui.cancelReqActionBtn.addEventListener('click', () => {
+            ui.requestActionModal.style.display = 'none';
+            requestToAction = null;
+        });
+
         ui.closeFinalReportModal.addEventListener('click', () => { ui.finalReportModal.style.display = 'none'; });
         ui.userSearchFilter.addEventListener('keyup', filterAndRenderUsersManagementTable);
         ui.userStatusFilter.addEventListener('change', filterAndRenderUsersManagementTable);
