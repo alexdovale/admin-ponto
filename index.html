@@ -507,11 +507,12 @@
 
                 let dailyBalanceText = '---', dailyBalanceClass = 'text-gray-700';
 
+                // *** START: REVISED LOGIC FOR BALANCE CALCULATION ***
                 if (isWeekend) {
                     dailyBalanceText = 'Fim de Semana';
                     dailyBalanceClass = 'text-gray-500 italic';
                 } else if (isFutureDay) {
-                    // Mantém o padrão '---'
+                    // Keeps the default '---'
                 } else if (dayEntries.length % 2 !== 0) {
                     dailyBalanceText = 'Batida Ímpar';
                     dailyBalanceClass = 'text-orange-500 font-bold';
@@ -527,34 +528,43 @@
                     }
 
                     const justification = approvedRequests[dateString];
-                    const creditedMs = justification ? (justification.abonoMinutes || 0) * 60 * 1000 : 0;
-                    
+                    let creditedMs = 0;
                     let balanceMs = 0;
-
+                    
                     if (justification) {
-                        if (workedMs === 0 && creditedMs === 0) {
-                            balanceMs = 0;
+                        const hasSpecificAbono = justification.abonoMinutes && justification.abonoMinutes > 0;
+                        
+                        if (hasSpecificAbono) {
+                            // Manager specified an exact amount of time to credit
+                            creditedMs = justification.abonoMinutes * 60 * 1000;
                         } else {
-                            balanceMs = (workedMs + creditedMs) - requiredWorkMs;
+                            // Justification without specific time (e.g., Férias, Atestado) should cover the missing time
+                            creditedMs = Math.max(0, requiredWorkMs - workedMs);
                         }
+                        
+                        balanceMs = (workedMs + creditedMs) - requiredWorkMs;
+
                         const displayBalance = Math.abs(balanceMs) <= 15 * 60 * 1000 ? '00:00' : formatMilliseconds(balanceMs, true);
                         dailyBalanceText = `${justification.text} (${displayBalance})`;
                         dailyBalanceClass = 'text-blue-600';
-                    } else if (dayEntries.length === 0) {
+
+                    } else if (dayEntries.length === 0) { // No justification, no clock-ins
                         dailyBalanceText = 'Falta';
                         dailyBalanceClass = 'text-red-600 font-bold';
                         balanceMs = -requiredWorkMs;
-                    } else {
+                    } else { // No justification, but there are clock-ins
                         balanceMs = workedMs - requiredWorkMs;
                         const displayBalance = Math.abs(balanceMs) <= 15 * 60 * 1000 ? '00:00' : formatMilliseconds(balanceMs, true);
                         dailyBalanceText = displayBalance;
                         dailyBalanceClass = balanceMs >= 0 ? 'text-green-600' : 'text-red-600';
                     }
 
+                    // Add to monthly total only if outside the 15-minute tolerance
                     if (Math.abs(balanceMs) > 15 * 60 * 1000) {
                         totalMonthlyBalanceMs += balanceMs;
                     }
                 }
+                // *** END: REVISED LOGIC FOR BALANCE CALCULATION ***
 
                 const row = document.createElement('tr');
                 row.innerHTML = `<td class="px-6 py-4">${dateString}</td><td class="px-6 py-4 capitalize">${dayOfWeek.replace('.','')}</td><td class="px-6 py-4">${ins}</td><td class="px-6 py-4">${outs}</td><td class="px-6 py-4 font-medium ${dailyBalanceClass}">${dailyBalanceText}</td>`;
@@ -1376,4 +1386,5 @@
     </script>
 </body>
 </html>
+
 
