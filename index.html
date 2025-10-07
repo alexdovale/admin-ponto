@@ -935,6 +935,16 @@
             if (searchText) {
                 filteredRequests = filteredRequests.filter(req => req.text.toLowerCase().includes(searchText));
             }
+
+            // Ordena as solicitações por data, da mais antiga para a mais recente
+            filteredRequests.sort((a, b) => {
+                const [dayA, monthA, yearA] = a.date.split('/');
+                const dateA = new Date(`${yearA}-${monthA}-${dayA}`);
+                const [dayB, monthB, yearB] = b.date.split('/');
+                const dateB = new Date(`${yearB}-${monthB}-${dayB}`);
+                return dateA - dateB;
+            });
+            
             renderRequestsTable(filteredRequests);
         }
 
@@ -1036,6 +1046,16 @@
                 const [, reqMonth, reqYear] = req.date.split('/');
                 return parseInt(reqYear, 10) === year && parseInt(reqMonth, 10) === month;
             });
+
+            // Ordena as solicitações do mês por data antes de adicionar ao PDF
+            monthRequests.sort((a, b) => {
+                const [dayA, monthA, yearA] = a.date.split('/');
+                const dateA = new Date(`${yearA}-${monthA}-${dayA}`);
+                const [dayB, monthB, yearB] = b.date.split('/');
+                const dateB = new Date(`${yearB}-${monthB}-${dayB}`);
+                return dateA - dateB;
+            });
+
             if (monthRequests.length > 0) {
                 doc.setFontSize(14); doc.text('Solicitações Autorizadas', 14, finalY + 15);
                 doc.autoTable({ head: [['Data', 'Motivo']], body: monthRequests.map(req => [req.date, req.text]), startY: finalY + 18, theme: 'grid', headStyles: { fillColor: [44, 62, 80] } });
@@ -1225,6 +1245,15 @@
                 doc.setFont('helvetica', 'bold');
                 doc.text('Solicitações Autorizadas', 14, finalY);
                 
+                // Ordena as solicitações por data antes de adicionar ao PDF final
+                reportData.approvedRequests.sort((a, b) => {
+                    const [dayA, monthA, yearA] = a.date.split('/');
+                    const dateA = new Date(`${yearA}-${monthA}-${dayA}`);
+                    const [dayB, monthB, yearB] = b.date.split('/');
+                    const dateB = new Date(`${yearB}-${monthB}-${dayB}`);
+                    return dateA - dateB;
+                });
+
                 const requestsHead = [['Data', 'Motivo']];
                 const requestsBody = reportData.approvedRequests.map(req => [req.date, req.text]);
 
@@ -1386,5 +1415,6 @@
     </script>
 </body>
 </html>
+
 
 
