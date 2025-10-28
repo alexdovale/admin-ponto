@@ -57,115 +57,152 @@
                             <p id="header-date" class="text-gray-600"></p>
                         </div>
                     </div>
-                    <button id="logout-button" class="px-4 py-2 text-sm font-medium text-green-600 bg-green-100 rounded-md hover:bg-green-200">Sair</button>
-                </div>
+                    <div class="flex items-center gap-4">
+                        <div class="relative">
+                            <div id="requests-notification-icon" class="relative p-2 rounded-full hover:bg-gray-100 cursor-pointer" title="Ver Solicitações Pendentes">
+                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-6 h-6 text-gray-600">
+                                    <path stroke-linecap="round" stroke-linejoin="round" d="M21.75 6.75v10.5a2.25 2.25 0 01-2.25 2.25h-15a2.25 2.25 0 01-2.25-2.25V6.75m19.5 0A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25m19.5 0v.243a2.25 2.25 0 01-1.07 1.916l-7.5 4.615a2.25 2.25 0 01-2.36 0L3.32 8.91a2.25 2.25 0 01-1.07-1.916V6.75" />
+                                </svg>
+                                <span id="requests-notification-badge" class="hidden absolute -top-1 -right-1 flex items-center justify-center w-5 h-5 text-xs font-bold text-white bg-red-600 rounded-full"></span>
+                            </div>
+
+                            <div id="requests-notification-popover" class="hidden absolute top-full right-0 mt-2 w-72 bg-white border border-gray-200 rounded-md shadow-lg z-50">
+                                <div class="p-3 border-b border-gray-200">
+                                    <h4 class="font-semibold text-gray-800">Solicitações Pendentes</h4>
+                                </div>
+                                <ul id="requests-notification-list" class="max-h-64 overflow-y-auto divide-y divide-gray-100">
+                                    <li class="p-3 text-sm text-gray-500">Nenhuma solicitação pendente.</li>
+                                </ul>
+                            </div>
+                        </div>
+                        <button id="logout-button" class="px-4 py-2 text-sm font-medium text-green-600 bg-green-100 rounded-md hover:bg-green-200">Sair</button>
+                    </div>
+                    </div>
 
                 <div class="space-y-6">
-                    <div>
-                        <h2 class="text-xl font-bold mb-4">Relatórios de Ponto</h2>
-                        <select id="user-dropdown" class="w-full p-2 border rounded-md mb-4"></select>
-                        <div class="flex flex-wrap gap-4 items-center">
-                            <input type="month" id="month-selector" class="p-2 border rounded-md">
-                            <button id="generate-report-btn" class="py-2 px-4 rounded-md text-white bg-green-600 hover:bg-green-700">Gerar Relatório</button>
-                            <button id="download-pdf-btn" class="py-2 px-4 rounded-md text-white bg-blue-600 hover:bg-blue-700 hidden">Baixar PDF</button>
+                    <div class="border-b border-gray-200">
+                        <nav class="-mb-px flex space-x-8" aria-label="Tabs">
+                            <button id="tab-reports" class="tab-button whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-green-500 text-green-600">
+                                Relatórios de Ponto
+                            </button>
+                            <button id="tab-requests" class="tab-button whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                                Solicitações
+                            </button>
+                            <button id="tab-users" class="tab-button whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">
+                                Gerenciamento
+                            </button>
+                        </nav>
+                    </div>
+                    <div id="tab-panel-reports" class="tab-panel space-y-6">
+                        <div>
+                            <h2 class="text-xl font-bold mb-4">Relatórios de Ponto</h2>
+                            <select id="user-dropdown" class="w-full p-2 border rounded-md mb-4"></select>
+                            <div class="flex flex-wrap gap-4 items-center">
+                                <input type="month" id="month-selector" class="p-2 border rounded-md">
+                                <button id="generate-report-btn" class="py-2 px-4 rounded-md text-white bg-green-600 hover:bg-green-700">Gerar Relatório</button>
+                                <button id="download-pdf-btn" class="py-2 px-4 rounded-md text-white bg-blue-600 hover:bg-blue-700 hidden">Baixar PDF</button>
+                            </div>
+                        </div>
+
+                        <div class="p-4 border border-gray-200 rounded-lg">
+                            <h3 class="text-lg font-medium mb-4">Lançamento Rápido de Período</h3>
+                            <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
+                                <div>
+                                    <label for="quick-entry-start-date" class="block text-sm font-medium text-gray-700">Data de Início:</label>
+                                    <input type="date" id="quick-entry-start-date" class="mt-1 p-2 border rounded-md w-full">
+                                </div>
+                                <div>
+                                    <label for="quick-entry-end-date" class="block text-sm font-medium text-gray-700">Data de Fim:</label>
+                                    <input type="date" id="quick-entry-end-date" class="mt-1 p-2 border rounded-md w-full">
+                                </div>
+                                <div>
+                                    <label for="quick-entry-type" class="block text-sm font-medium text-gray-700">Tipo:</label>
+                                    <select id="quick-entry-type" class="mt-1 p-2 border rounded-md w-full">
+                                        <option value="Férias">Férias</option>
+                                        <option value="Licença Médica">Licença Médica</option>
+                                        <option value="Licença Maternidade/Paternidade">Licença Maternidade/Paternidade</option>
+                                        <option value="Outra Licença">Outra Licença</option>
+                                    </select>
+                                </div>
+                                <button id="apply-quick-entry-btn" class="py-2 px-4 rounded-md text-white bg-indigo-600 hover:bg-indigo-700 h-10">Aplicar</button>
+                            </div>
+                            <p id="quick-entry-status" class="text-sm mt-4 text-center"></p>
+                        </div>
+                        
+                        <div id="reports-container">
+                            <h3 id="report-title" class="text-lg font-medium">Histórico de Registros</h3>
+                            <div class="mt-4 overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead id="report-table-head" class="bg-gray-50"></thead>
+                                    <tbody id="report-table-body" class="bg-white divide-y divide-gray-200"></tbody>
+                                </table>
+                                <div id="monthly-balance" class="mt-4 p-4 bg-gray-100 rounded-md font-bold text-center hidden"></div>
+                                <div id="occurrence-section" class="mt-4 hidden">
+                                    <label for="occurrence-details" class="block text-sm font-medium text-gray-700 mb-1">Registro de Ocorrência:</label>
+                                    <textarea id="occurrence-details" rows="3" class="w-full p-2 border rounded-md" placeholder="Digite aqui qualquer ocorrência para incluir no relatório..."></textarea>
+                                    <div class="flex justify-end items-center mt-2">
+                                        <span id="occurrence-status" class="text-sm text-gray-500 mr-4"></span>
+                                        <button id="save-occurrence-btn" class="py-1 px-3 rounded-md text-sm text-white bg-indigo-600 hover:bg-indigo-700">Salvar Ocorrência</button>
+                                    </div>
+                                </div>
+                                <p id="no-report-message" class="text-center py-4 text-gray-500">Selecione um funcionário para ver o relatório.</p>
+                            </div>
                         </div>
                     </div>
 
-                    <div class="p-4 border border-gray-200 rounded-lg">
-                        <h3 class="text-lg font-medium mb-4">Lançamento Rápido de Período</h3>
-                        <div class="grid grid-cols-1 sm:grid-cols-4 gap-4 items-end">
-                            <div>
-                                <label for="quick-entry-start-date" class="block text-sm font-medium text-gray-700">Data de Início:</label>
-                                <input type="date" id="quick-entry-start-date" class="mt-1 p-2 border rounded-md w-full">
+                    <div id="tab-panel-requests" class="tab-panel hidden">
+                        <div>
+                            <h3 class="text-lg font-medium">Solicitações de Funcionários</h3>
+                            <div class="my-4 flex flex-wrap gap-4 items-center p-4 bg-gray-50 rounded-lg">
+                                <select id="request-user-filter" class="p-2 border rounded-md flex-grow sm:flex-grow-0"></select>
+                                <input type="date" id="request-start-date-filter" class="p-2 border rounded-md flex-grow sm:flex-grow-0">
+                                <input type="date" id="request-end-date-filter" class="p-2 border rounded-md flex-grow sm:flex-grow-0">
+                                <input type="text" id="request-search-filter" class="p-2 border rounded-md flex-grow" placeholder="Pesquisar por texto...">
                             </div>
-                            <div>
-                                <label for="quick-entry-end-date" class="block text-sm font-medium text-gray-700">Data de Fim:</label>
-                                <input type="date" id="quick-entry-end-date" class="mt-1 p-2 border rounded-md w-full">
+                            <div class="mt-4 overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Funcionário</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mensagem</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="request-table-body" class="bg-white divide-y divide-gray-200"></tbody>
+                                </table>
                             </div>
-                            <div>
-                                <label for="quick-entry-type" class="block text-sm font-medium text-gray-700">Tipo:</label>
-                                <select id="quick-entry-type" class="mt-1 p-2 border rounded-md w-full">
-                                    <option value="Férias">Férias</option>
-                                    <option value="Licença Médica">Licença Médica</option>
-                                    <option value="Licença Maternidade/Paternidade">Licença Maternidade/Paternidade</option>
-                                    <option value="Outra Licença">Outra Licença</option>
+                        </div>
+                    </div>
+
+                    <div id="tab-panel-users" class="tab-panel hidden">
+                        <div>
+                            <h3 class="text-lg font-medium">Gerenciamento de Usuários</h3>
+                            <div class="my-4 flex flex-wrap gap-4 items-center p-4 bg-gray-50 rounded-lg">
+                                <input type="text" id="user-search-filter" class="p-2 border rounded-md flex-grow" placeholder="Pesquisar por nome...">
+                                <select id="user-status-filter" class="p-2 border rounded-md">
+                                    <option value="all">Todos os Status</option>
+                                    <option value="active" selected>Ativos</option>
+                                    <option value="inactive">Inativos</option>
                                 </select>
                             </div>
-                            <button id="apply-quick-entry-btn" class="py-2 px-4 rounded-md text-white bg-indigo-600 hover:bg-indigo-700 h-10">Aplicar</button>
-                        </div>
-                        <p id="quick-entry-status" class="text-sm mt-4 text-center"></p>
-                    </div>
-                    
-                    <div id="reports-container">
-                        <h3 id="report-title" class="text-lg font-medium">Histórico de Registros</h3>
-                        <div class="mt-4 overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead id="report-table-head" class="bg-gray-50"></thead>
-                                <tbody id="report-table-body" class="bg-white divide-y divide-gray-200"></tbody>
-                            </table>
-                            <div id="monthly-balance" class="mt-4 p-4 bg-gray-100 rounded-md font-bold text-center hidden"></div>
-                            <div id="occurrence-section" class="mt-4 hidden">
-                                <label for="occurrence-details" class="block text-sm font-medium text-gray-700 mb-1">Registro de Ocorrência:</label>
-                                <textarea id="occurrence-details" rows="3" class="w-full p-2 border rounded-md" placeholder="Digite aqui qualquer ocorrência para incluir no relatório..."></textarea>
-                                <div class="flex justify-end items-center mt-2">
-                                    <span id="occurrence-status" class="text-sm text-gray-500 mr-4"></span>
-                                    <button id="save-occurrence-btn" class="py-1 px-3 rounded-md text-sm text-white bg-indigo-600 hover:bg-indigo-700">Salvar Ocorrência</button>
-                                </div>
+                            <div class="mt-4 overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                                            <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="users-management-table-body" class="bg-white divide-y divide-gray-200">
+                                    </tbody>
+                                </table>
                             </div>
-                            <p id="no-report-message" class="text-center py-4 text-gray-500">Selecione um funcionário para ver o relatório.</p>
                         </div>
                     </div>
-
-                    <div class="mt-8">
-                        <h3 class="text-lg font-medium">Solicitações de Funcionários</h3>
-                        <div class="my-4 flex flex-wrap gap-4 items-center p-4 bg-gray-50 rounded-lg">
-                            <select id="request-user-filter" class="p-2 border rounded-md flex-grow sm:flex-grow-0"></select>
-                            <input type="date" id="request-start-date-filter" class="p-2 border rounded-md flex-grow sm:flex-grow-0">
-                            <input type="date" id="request-end-date-filter" class="p-2 border rounded-md flex-grow sm:flex-grow-0">
-                            <input type="text" id="request-search-filter" class="p-2 border rounded-md flex-grow" placeholder="Pesquisar por texto...">
-                        </div>
-                        <div class="mt-4 overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Funcionário</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Mensagem</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="request-table-body" class="bg-white divide-y divide-gray-200"></tbody>
-                            </table>
-                        </div>
                     </div>
-
-                    <div class="mt-8">
-                        <h3 class="text-lg font-medium">Gerenciamento de Usuários</h3>
-                        <div class="my-4 flex flex-wrap gap-4 items-center p-4 bg-gray-50 rounded-lg">
-                            <input type="text" id="user-search-filter" class="p-2 border rounded-md flex-grow" placeholder="Pesquisar por nome...">
-                            <select id="user-status-filter" class="p-2 border rounded-md">
-                                <option value="all">Todos os Status</option>
-                                <option value="active" selected>Ativos</option>
-                                <option value="inactive">Inativos</option>
-                            </select>
-                        </div>
-                        <div class="mt-4 overflow-x-auto">
-                            <table class="min-w-full divide-y divide-gray-200">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Nome</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="users-management-table-body" class="bg-white divide-y divide-gray-200">
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-
-                </div>
             </div>
         </div>
     </main>
@@ -184,8 +221,6 @@
     <div id="delete-confirm-modal" class="modal"><div class="modal-content"><h3 id="delete-modal-title" class="text-lg font-medium mb-4">Confirmar Exclusão</h3><p id="delete-modal-text" class="text-sm text-gray-600 mb-4"></p><div class="flex justify-end gap-4"><button id="cancel-delete-btn" class="py-2 px-4 rounded-md text-gray-700 bg-gray-200 hover:bg-gray-300">Cancelar</button><button id="confirm-delete-btn" class="py-2 px-4 rounded-md text-white bg-red-600 hover:bg-red-700">Apagar</button></div></div></div>
     <div id="edit-modal" class="modal"><div class="modal-content"><h3 class="text-lg font-medium mb-4">Editar Registro de Ponto</h3><div class="mb-4"><label for="edit-time-input" class="block text-sm font-medium text-gray-700 mb-1">Horário:</label><input type="time" id="edit-time-input" class="w-full px-3 py-2 border rounded-md"></div><div class="flex justify-end gap-4"><button id="cancel-edit-btn" class="py-2 px-4 rounded-md text-gray-700 bg-gray-200 hover:bg-gray-300">Cancelar</button><button id="save-edit-btn" class="py-2 px-4 rounded-md text-white bg-green-600 hover:bg-green-700">Salvar</button></div></div></div>
     <div id="add-entry-modal" class="modal"><div class="modal-content"><h3 class="text-lg font-medium mb-4">Adicionar/Editar Batidas do Dia</h3><p id="add-entry-date" class="text-sm font-bold mb-4 text-gray-700"></p><div class="grid grid-cols-2 gap-4"><div><label for="add-entry-in-1" class="block text-sm font-medium text-gray-700 mb-1">Entrada:</label><input type="time" id="add-entry-in-1" class="w-full px-3 py-2 border rounded-md"></div><div><label for="add-entry-out-1" class="block text-sm font-medium text-gray-700 mb-1">Saída:</label><input type="time" id="add-entry-out-1" class="w-full px-3 py-2 border rounded-md"></div></div><p id="add-entry-message" class="text-sm mt-4 text-center"></p><div class="flex justify-end gap-4 mt-6"><button id="cancel-add-btn" class="py-2 px-4 rounded-md text-gray-700 bg-gray-200 hover:bg-gray-300">Cancelar</button><button id="save-add-btn" class="py-2 px-4 rounded-md text-white bg-green-600 hover:bg-green-700">Salvar</button></div></div></div>
-    
-    <!-- MODAL DE JUSTIFICATIVA ATUALIZADO -->
     <div id="justify-modal" class="modal">
         <div class="modal-content">
             <h3 class="text-lg font-medium mb-4">Justificar/Abonar Dia</h3>
@@ -208,7 +243,6 @@
             </div>
         </div>
     </div>
-    
     <div id="request-action-modal" class="modal">
         <div class="modal-content">
             <h3 class="text-lg font-medium mb-4">Analisar Solicitação</h3>
@@ -234,14 +268,12 @@
             </div>
         </div>
     </div>
-
     <div id="final-report-modal" class="modal">
         <div class="modal-content max-w-3xl w-full">
             <span id="close-final-report-modal" class="float-right text-2xl font-bold cursor-pointer">&times;</span>
             <h3 class="text-lg font-bold mb-4">Relatório Final de Horas</h3>
             <div id="final-report-content" class="space-y-3 text-gray-700">
-                <!-- Report details will be injected here -->
-            </div>
+                </div>
             <div class="flex justify-end gap-4 mt-6">
                 <button id="download-final-pdf-btn" class="py-2 px-4 rounded-md text-white bg-blue-600 hover:bg-blue-700">Baixar PDF</button>
             </div>
@@ -344,6 +376,18 @@
             quickEntryType: document.getElementById('quick-entry-type'),
             applyQuickEntryBtn: document.getElementById('apply-quick-entry-btn'),
             quickEntryStatus: document.getElementById('quick-entry-status'),
+            // Abas
+            tabReports: document.getElementById('tab-reports'),
+            tabRequests: document.getElementById('tab-requests'),
+            tabUsers: document.getElementById('tab-users'),
+            panelReports: document.getElementById('tab-panel-reports'),
+            panelRequests: document.getElementById('tab-panel-requests'),
+            panelUsers: document.getElementById('tab-panel-users'),
+            // Notificação
+            notificationIcon: document.getElementById('requests-notification-icon'),
+            notificationBadge: document.getElementById('requests-notification-badge'),
+            notificationPopover: document.getElementById('requests-notification-popover'),
+            notificationList: document.getElementById('requests-notification-list'),
         };
 
         let unsubscribe = { users: null, requests: null, entries: null };
@@ -402,9 +446,72 @@
                 unsubscribe.requests = onSnapshot(query(requestsRef, orderBy("createdAt", "desc")), (requestsSnapshot) => {
                     allRequests = requestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     filterAndRenderRequests();
+                    
+                    // *** INÍCIO: LÓGICA DE NOTIFICAÇÃO E POPOVER ***
+                    const pendingRequests = allRequests.filter(req => 
+                        req.status === 'pending' && 
+                        filteredEmployees.some(emp => emp.id === req.userId)
+                    );
+                    const pendingCount = pendingRequests.length;
+
+                    if (pendingCount > 0) {
+                        ui.notificationBadge.textContent = pendingCount;
+                        ui.notificationBadge.classList.remove('hidden');
+                    } else {
+                        ui.notificationBadge.classList.add('hidden');
+                    }
+                    
+                    // Renderiza o popover com a lista de pendências
+                    renderNotificationPopover(pendingRequests);
+                    // *** FIM: LÓGICA DE NOTIFICAÇÃO E POPOVER ***
                 });
             });
         }
+        
+        function renderNotificationPopover(pendingRequests) {
+            ui.notificationList.innerHTML = ''; // Limpa a lista
+            
+            // Ordena por data (mais antiga primeiro) para o popover
+            pendingRequests.sort((a, b) => {
+                const [dayA, monthA, yearA] = a.date.split('/');
+                const dateA = new Date(yearA, monthA - 1, dayA); // Correto: Y, M-1, D
+                const [dayB, monthB, yearB] = b.date.split('/');
+                const dateB = new Date(yearB, monthB - 1, dayB); // Correto: Y, M-1, D
+                return dateA - dateB;
+            });
+            
+            if (pendingRequests.length === 0) {
+                ui.notificationList.innerHTML = '<li class="p-3 text-sm text-gray-500">Nenhuma solicitação pendente.</li>';
+                return;
+            }
+
+            pendingRequests.forEach(req => {
+                const li = document.createElement('li');
+                li.className = 'p-3 text-sm hover:bg-gray-50 cursor-pointer';
+                li.innerHTML = `<strong>${req.userName}</strong><span class="text-gray-600 block">Data: ${req.date}</span>`;
+                li.dataset.userId = req.userId;
+                
+                // Formata a data 'DD/MM/YYYY' para 'YYYY-MM-DD' para os inputs de data
+                const [day, month, year] = req.date.split('/');
+                const isoDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+                li.dataset.date = isoDate;
+                
+                // Adiciona o clique para filtrar e ir para a aba
+                li.addEventListener('click', () => {
+                    switchTab(ui.tabRequests, ui.panelRequests); // Muda para a aba de solicitações
+                    
+                    ui.requestUserFilter.value = req.userId;
+                    ui.requestStartDateFilter.value = isoDate;
+                    ui.requestEndDateFilter.value = isoDate;
+                    
+                    filterAndRenderRequests(); // Dispara o filtro
+                    
+                    ui.notificationPopover.classList.add('hidden'); // Fecha o popover
+                });
+                ui.notificationList.appendChild(li);
+            });
+        }
+
 
         function renderUserDropdown(users) {
             ui.userDropdown.innerHTML = '<option value="">Selecione um funcionário</option>';
@@ -580,6 +687,15 @@
         
         ui.userDropdown.addEventListener('change', async (e) => {
             const selectedUserId = e.target.value;
+            
+            // **** INÍCIO: LÓGICA DE SINCRONIZAÇÃO ****
+            // Atualiza o valor do filtro na outra aba
+            if (ui.requestUserFilter.value !== selectedUserId) {
+                ui.requestUserFilter.value = selectedUserId;
+                filterAndRenderRequests(); // Atualiza a tabela de solicitações
+            }
+            // **** FIM: LÓGICA DE SINCRONIZAÇÃO ****
+
             ui.monthlyBalance.classList.add('hidden');
             ui.downloadPdfBtn.classList.add('hidden');
             
@@ -893,22 +1009,34 @@
         ui.cancelEditBtn.addEventListener('click', () => { recordToEdit = null; ui.editModal.style.display = 'none'; });
 
         function setupRequestFilters(users) {
-            ui.requestUserFilter.innerHTML = '<option value="none" selected>Nenhum</option><option value="">Todos os Funcionários</option>';
+            ui.requestUserFilter.innerHTML = '<option value="">Todos os Funcionários</option>';
             users.forEach(user => {
                 const option = document.createElement('option');
                 option.value = user.id;
                 option.textContent = user.name;
                 ui.requestUserFilter.appendChild(option);
             });
+            // Adiciona a opção 'Nenhum' ao final, e a seleciona
+            ui.requestUserFilter.innerHTML += '<option value="none">Nenhum</option>';
+            ui.requestUserFilter.value = 'none';
+
 
             [ui.requestUserFilter, ui.requestStartDateFilter, ui.requestEndDateFilter, ui.requestSearchFilter].forEach(el => {
                 el.addEventListener('change', filterAndRenderRequests);
-                if (el.type === 'text') el.addEventListener('keyup', filterAndRenderRequests);
+                if (el.type === 'text' || el.type === 'date') el.addEventListener('keyup', filterAndRenderRequests);
             });
         }
 
         function filterAndRenderRequests() {
             const selectedUserId = ui.requestUserFilter.value;
+            
+            // **** INÍCIO: LÓGICA DE SINCRONIZAÇÃO ****
+            // Atualiza o valor do dropdown na outra aba
+            if (ui.userDropdown.value !== selectedUserId) {
+                ui.userDropdown.value = selectedUserId;
+            }
+            // **** FIM: LÓGICA DE SINCRONIZAÇÃO ****
+
             const startDate = ui.requestStartDateFilter.value ? new Date(ui.requestStartDateFilter.value + 'T00:00:00') : null;
             const endDate = ui.requestEndDateFilter.value ? new Date(ui.requestEndDateFilter.value + 'T23:59:59') : null;
             const searchText = ui.requestSearchFilter.value.toLowerCase();
@@ -920,18 +1048,26 @@
             } else if (selectedUserId) {
                 filteredRequests = filteredRequests.filter(req => req.userId === selectedUserId);
             }
+            
+            // **** INÍCIO: CORREÇÃO DO FILTRO DE DATA ****
             if (startDate) {
                 filteredRequests = filteredRequests.filter(req => {
                     const [day, month, year] = req.date.split('/');
-                    return new Date(`${year}-${month}-${day}`) >= startDate;
+                    // Cria a data da solicitação como meia-noite local
+                    const reqDate = new Date(year, month - 1, day);
+                    return reqDate >= startDate;
                 });
             }
             if (endDate) {
                 filteredRequests = filteredRequests.filter(req => {
                     const [day, month, year] = req.date.split('/');
-                    return new Date(`${year}-${month}-${day}`) <= endDate;
+                    // Cria a data da solicitação como meia-noite local
+                    const reqDate = new Date(year, month - 1, day);
+                    return reqDate <= endDate;
                 });
             }
+            // **** FIM: CORREÇÃO DO FILTRO DE DATA ****
+            
             if (searchText) {
                 filteredRequests = filteredRequests.filter(req => req.text.toLowerCase().includes(searchText));
             }
@@ -939,9 +1075,9 @@
             // Ordena as solicitações por data, da mais antiga para a mais recente
             filteredRequests.sort((a, b) => {
                 const [dayA, monthA, yearA] = a.date.split('/');
-                const dateA = new Date(`${yearA}-${monthA}-${dayA}`);
+                const dateA = new Date(yearA, monthA - 1, dayA);
                 const [dayB, monthB, yearB] = b.date.split('/');
-                const dateB = new Date(`${yearB}-${monthB}-${dayB}`);
+                const dateB = new Date(yearB, monthB - 1, dayB);
                 return dateA - dateB;
             });
             
@@ -950,6 +1086,12 @@
 
         function renderRequestsTable(requests) {
             ui.requestTableBody.innerHTML = '';
+            
+            if (requests.length === 0) {
+                 ui.requestTableBody.innerHTML = '<tr><td colspan="5" class="text-center py-4 text-gray-500">Nenhuma solicitação encontrada para os filtros aplicados.</td></tr>';
+                 return;
+            }
+            
             requests.forEach(req => {
                 const statusClass = req.status === 'pending' ? 'bg-yellow-100 text-yellow-800' : req.status === 'approved' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800';
                 const row = document.createElement('tr');
@@ -1050,9 +1192,9 @@
             // Ordena as solicitações do mês por data antes de adicionar ao PDF
             monthRequests.sort((a, b) => {
                 const [dayA, monthA, yearA] = a.date.split('/');
-                const dateA = new Date(`${yearA}-${monthA}-${dayA}`);
+                const dateA = new Date(yearA, monthA - 1, dayA);
                 const [dayB, monthB, yearB] = b.date.split('/');
-                const dateB = new Date(`${yearB}-${monthB}-${dayB}`);
+                const dateB = new Date(yearB, monthB - 1, dayB);
                 return dateA - dateB;
             });
 
@@ -1248,9 +1390,9 @@
                 // Ordena as solicitações por data antes de adicionar ao PDF final
                 reportData.approvedRequests.sort((a, b) => {
                     const [dayA, monthA, yearA] = a.date.split('/');
-                    const dateA = new Date(`${yearA}-${monthA}-${dayA}`);
+                    const dateA = new Date(yearA, monthA - 1, dayA);
                     const [dayB, monthB, yearB] = b.date.split('/');
-                    const dateB = new Date(`${yearB}-${monthB}-${dayB}`);
+                    const dateB = new Date(yearB, monthB - 1, dayB);
                     return dateA - dateB;
                 });
 
@@ -1340,6 +1482,41 @@
         ui.userStatusFilter.addEventListener('change', filterAndRenderUsersManagementTable);
         ui.applyQuickEntryBtn.addEventListener('click', applyQuickEntry);
 
+        // *** INÍCIO: LÓGICA DAS ABAS ***
+        const tabs = [ui.tabReports, ui.tabRequests, ui.tabUsers];
+        const panels = [ui.panelReports, ui.panelRequests, ui.panelUsers];
+
+        function switchTab(clickedTab, targetPanel) {
+            tabs.forEach(tab => {
+                tab.classList.remove('border-green-500', 'text-green-600');
+                tab.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+            });
+            panels.forEach(panel => panel.classList.add('hidden'));
+
+            clickedTab.classList.add('border-green-500', 'text-green-600');
+            clickedTab.classList.remove('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+            targetPanel.classList.remove('hidden');
+        }
+
+        ui.tabReports.addEventListener('click', () => switchTab(ui.tabReports, ui.panelReports));
+        ui.tabRequests.addEventListener('click', () => switchTab(ui.tabRequests, ui.panelRequests));
+        ui.tabUsers.addEventListener('click', () => switchTab(ui.tabUsers, ui.panelUsers));
+        
+        // **** INÍCIO: LÓGICA DO POPOVER DE NOTIFICAÇÃO ****
+        // Clicar no ícone de notificação abre/fecha o popover
+        ui.notificationIcon.addEventListener('click', (e) => {
+            e.stopPropagation(); // Impede que o clique no ícone seja pego pelo listener do 'document'
+            ui.notificationPopover.classList.toggle('hidden');
+        });
+        
+        // Clicar em qualquer lugar fora do popover o fecha
+        document.addEventListener('click', (e) => {
+            if (!ui.notificationIcon.contains(e.target) && !ui.notificationPopover.contains(e.target)) {
+                ui.notificationPopover.classList.add('hidden');
+            }
+        });
+        // **** FIM: LÓGICA DO POPOVER DE NOTIFICAÇÃO ****
+
         async function applyQuickEntry() {
             const userId = ui.userDropdown.value;
             const startDateStr = ui.quickEntryStartDate.value;
@@ -1415,6 +1592,3 @@
     </script>
 </body>
 </html>
-
-
-
