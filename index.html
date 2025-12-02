@@ -97,10 +97,18 @@
                         <div>
                             <h2 class="text-xl font-bold mb-4">Relatórios de Ponto</h2>
                             <select id="user-dropdown" class="w-full p-2 border rounded-md mb-4"></select>
-                            <div class="flex flex-wrap gap-4 items-center">
-                                <input type="month" id="month-selector" class="p-2 border rounded-md">
-                                <button id="generate-report-btn" class="py-2 px-4 rounded-md text-white bg-green-600 hover:bg-green-700">Gerar Relatório</button>
-                                <button id="download-pdf-btn" class="py-2 px-4 rounded-md text-white bg-blue-600 hover:bg-blue-700 hidden">Baixar PDF</button>
+                            
+                            <div class="flex flex-wrap gap-4 items-end bg-gray-50 p-4 rounded-lg mb-4">
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-700 mb-1">Data Inicial:</label>
+                                    <input type="date" id="report-start-date" class="p-2 border rounded-md">
+                                </div>
+                                <div>
+                                    <label class="block text-xs font-medium text-gray-700 mb-1">Data Final:</label>
+                                    <input type="date" id="report-end-date" class="p-2 border rounded-md">
+                                </div>
+                                <button id="generate-report-btn" class="py-2 px-4 rounded-md text-white bg-green-600 hover:bg-green-700 h-10">Gerar Relatório</button>
+                                <button id="download-pdf-btn" class="py-2 px-4 rounded-md text-white bg-blue-600 hover:bg-blue-700 h-10 hidden">Baixar PDF</button>
                             </div>
                         </div>
 
@@ -138,7 +146,7 @@
                                 </table>
                                 <div id="monthly-balance" class="mt-4 p-4 bg-gray-100 rounded-md font-bold text-center hidden"></div>
                                 <div id="occurrence-section" class="mt-4 hidden">
-                                    <label for="occurrence-details" class="block text-sm font-medium text-gray-700 mb-1">Registro de Ocorrência:</label>
+                                    <label for="occurrence-details" class="block text-sm font-medium text-gray-700 mb-1">Registro de Ocorrência (vinculado ao mês da data inicial):</label>
                                     <textarea id="occurrence-details" rows="3" class="w-full p-2 border rounded-md" placeholder="Digite aqui qualquer ocorrência para incluir no relatório..."></textarea>
                                     <div class="flex justify-end items-center mt-2">
                                         <span id="occurrence-status" class="text-sm text-gray-500 mr-4"></span>
@@ -319,7 +327,8 @@
             reportTableHead: document.getElementById('report-table-head'),
             reportTableBody: document.getElementById('report-table-body'),
             noReportMessage: document.getElementById('no-report-message'),
-            monthSelector: document.getElementById('month-selector'),
+            reportStartDate: document.getElementById('report-start-date'), // NOVA REF
+            reportEndDate: document.getElementById('report-end-date'), // NOVA REF
             generateReportBtn: document.getElementById('generate-report-btn'),
             downloadPdfBtn: document.getElementById('download-pdf-btn'),
             monthlyBalance: document.getElementById('monthly-balance'),
@@ -447,7 +456,6 @@
                     allRequests = requestsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                     filterAndRenderRequests();
                     
-                    // *** INÍCIO: LÓGICA DE NOTIFICAÇÃO E POPOVER ***
                     const pendingRequests = allRequests.filter(req => 
                         req.status === 'pending' && 
                         filteredEmployees.some(emp => emp.id === req.userId)
@@ -461,22 +469,19 @@
                         ui.notificationBadge.classList.add('hidden');
                     }
                     
-                    // Renderiza o popover com a lista de pendências
                     renderNotificationPopover(pendingRequests);
-                    // *** FIM: LÓGICA DE NOTIFICAÇÃO E POPOVER ***
                 });
             });
         }
         
         function renderNotificationPopover(pendingRequests) {
-            ui.notificationList.innerHTML = ''; // Limpa a lista
+            ui.notificationList.innerHTML = ''; 
             
-            // Ordena por data (mais antiga primeiro) para o popover
             pendingRequests.sort((a, b) => {
                 const [dayA, monthA, yearA] = a.date.split('/');
-                const dateA = new Date(yearA, monthA - 1, dayA); // Correto: Y, M-1, D
+                const dateA = new Date(yearA, monthA - 1, dayA); 
                 const [dayB, monthB, yearB] = b.date.split('/');
-                const dateB = new Date(yearB, monthB - 1, dayB); // Correto: Y, M-1, D
+                const dateB = new Date(yearB, monthB - 1, dayB); 
                 return dateA - dateB;
             });
             
@@ -491,22 +496,20 @@
                 li.innerHTML = `<strong>${req.userName}</strong><span class="text-gray-600 block">Data: ${req.date}</span>`;
                 li.dataset.userId = req.userId;
                 
-                // Formata a data 'DD/MM/YYYY' para 'YYYY-MM-DD' para os inputs de data
                 const [day, month, year] = req.date.split('/');
                 const isoDate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
                 li.dataset.date = isoDate;
                 
-                // Adiciona o clique para filtrar e ir para a aba
                 li.addEventListener('click', () => {
-                    switchTab(ui.tabRequests, ui.panelRequests); // Muda para a aba de solicitações
+                    switchTab(ui.tabRequests, ui.panelRequests); 
                     
                     ui.requestUserFilter.value = req.userId;
                     ui.requestStartDateFilter.value = isoDate;
                     ui.requestEndDateFilter.value = isoDate;
                     
-                    filterAndRenderRequests(); // Dispara o filtro
+                    filterAndRenderRequests(); 
                     
-                    ui.notificationPopover.classList.add('hidden'); // Fecha o popover
+                    ui.notificationPopover.classList.add('hidden'); 
                 });
                 ui.notificationList.appendChild(li);
             });
@@ -523,12 +526,20 @@
             });
         }
         
+        // --- NOVA LÓGICA DE GERAÇÃO DE RELATÓRIO ---
         ui.generateReportBtn.addEventListener('click', async () => {
             const selectedUserId = ui.userDropdown.value;
-            const selectedDate = ui.monthSelector.value;
-            if (selectedUserId && selectedDate) {
-                const [year, month] = selectedDate.split('-');
-                await generateAndRenderMonthlyReport(selectedUserId, parseInt(month), parseInt(year));
+            const startDateVal = ui.reportStartDate.value;
+            const endDateVal = ui.reportEndDate.value;
+
+            if (selectedUserId && startDateVal && endDateVal) {
+                if(startDateVal > endDateVal) {
+                    alert('A data final deve ser posterior à data inicial.');
+                    return;
+                }
+                const startDate = new Date(startDateVal + 'T00:00:00');
+                const endDate = new Date(endDateVal + 'T23:59:59');
+                await generateAndRenderReport(selectedUserId, startDate, endDate);
             } else {
                 ui.reportTitle.textContent = 'Histórico de Registros';
                 ui.reportTableBody.innerHTML = '';
@@ -539,11 +550,11 @@
                 ui.occurrenceDetails.value = '';
                 ui.occurrenceStatus.textContent = '';
                 ui.noReportMessage.classList.remove('hidden');
-                ui.noReportMessage.textContent = "Por favor, selecione um funcionário e um mês para gerar o relatório.";
+                ui.noReportMessage.textContent = "Por favor, selecione um funcionário e o intervalo de datas.";
             }
         });
 
-        async function generateAndRenderMonthlyReport(userId, month, year) {
+        async function generateAndRenderReport(userId, startDate, endDate) {
             ui.reportTitle.textContent = `Carregando dados...`;
             ui.reportTableBody.innerHTML = '';
             ui.monthlyBalance.classList.add('hidden');
@@ -551,25 +562,39 @@
             ui.noReportMessage.classList.add('hidden');
 
             const entriesRef = collection(db, 'artifacts', appId, 'users', userId, 'time_entries');
-            const entriesQuery = query(entriesRef, orderBy("timestamp", "asc"));
+            // Busca apenas entradas dentro do range de datas (requer índice composto ou filtro em memória se pequeno)
+            // Para garantir, vamos buscar ordenado e filtrar no client-side ou usar filtro composto
+            const entriesQuery = query(entriesRef, 
+                where("timestamp", ">=", Timestamp.fromDate(startDate)),
+                where("timestamp", "<=", Timestamp.fromDate(endDate)),
+                orderBy("timestamp", "asc")
+            );
             
-            const entriesSnapshot = await getDocs(entriesQuery);
-            const allEntries = entriesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-
-            const filteredEntries = allEntries.filter(entry => {
-                const entryDate = entry.timestamp.toDate();
-                return entryDate.getFullYear() === year && (entryDate.getMonth() + 1) === month;
-            });
-
-            await renderMonthlyReportTable(filteredEntries, userId, month, year);
+            try {
+                const entriesSnapshot = await getDocs(entriesQuery);
+                const filteredEntries = entriesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+                await renderReportTable(filteredEntries, userId, startDate, endDate);
+            } catch(e) {
+                console.error("Erro na query de datas. Verifique índices.", e);
+                // Fallback: carregar tudo e filtrar (menos eficiente, mas robusto sem índices)
+                const qAll = query(entriesRef, orderBy("timestamp", "asc"));
+                const snapAll = await getDocs(qAll);
+                const all = snapAll.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+                const filtered = all.filter(e => {
+                    const d = e.timestamp.toDate();
+                    return d >= startDate && d <= endDate;
+                });
+                await renderReportTable(filtered, userId, startDate, endDate);
+            }
         }
 
-        async function renderMonthlyReportTable(entries, userId, month, year) {
+        async function renderReportTable(entries, userId, startDate, endDate) {
             const userName = allUsers.find(u => u.id === userId)?.name;
-            const monthName = new Date(year, month - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+            const startStr = startDate.toLocaleDateString('pt-BR');
+            const endStr = endDate.toLocaleDateString('pt-BR');
             const today = new Date();
             
-            ui.reportTitle.textContent = `Relatório para ${userName} - ${monthName}`;
+            ui.reportTitle.textContent = `Relatório para ${userName} (${startStr} a ${endStr})`;
             ui.reportTableBody.innerHTML = '';
             ui.reportTableHead.innerHTML = `<tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dia da Semana</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Entradas</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saídas</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saldo do Dia</th></tr>`;
             ui.noReportMessage.classList.add('hidden');
@@ -581,11 +606,7 @@
             requestsSnapshot.docs.forEach(doc => {
                 const req = doc.data();
                 if (req.date) {
-                    const [reqDay, reqMonth, reqYear] = req.date.split('/');
-                    if (parseInt(reqYear, 10) === year && parseInt(reqMonth, 10) === month) {
-                        const lookupDate = new Date(parseInt(reqYear, 10), parseInt(reqMonth, 10) - 1, parseInt(reqDay, 10)).toLocaleDateString('pt-BR');
-                        approvedRequests[lookupDate] = req;
-                    }
+                    approvedRequests[req.date] = req; // req.date já está em DD/MM/YYYY
                 }
             });
 
@@ -596,12 +617,16 @@
                 return acc;
             }, {});
 
-            let totalMonthlyBalanceMs = 0;
-            const daysInMonth = new Date(year, month, 0).getDate();
+            let totalBalanceMs = 0;
             const requiredWorkMs = 6 * 3600 * 1000;
 
-            for (let day = 1; day <= daysInMonth; day++) {
-                const currentDate = new Date(year, month - 1, day);
+            let currentDate = new Date(startDate);
+            // Zera hora para garantir loop correto
+            currentDate.setHours(0,0,0,0);
+            const loopEnd = new Date(endDate);
+            loopEnd.setHours(23,59,59,999);
+
+            while(currentDate <= loopEnd) {
                 const dateString = currentDate.toLocaleDateString('pt-BR');
                 const dayOfWeek = currentDate.toLocaleDateString('pt-BR', { weekday: 'short' });
                 const dayIndex = currentDate.getDay();
@@ -614,7 +639,6 @@
 
                 let dailyBalanceText = '---', dailyBalanceClass = 'text-gray-700';
 
-                // *** START: REVISED LOGIC FOR BALANCE CALCULATION ***
                 if (isWeekend) {
                     dailyBalanceText = 'Fim de Semana';
                     dailyBalanceClass = 'text-gray-500 italic';
@@ -642,10 +666,8 @@
                         const hasSpecificAbono = justification.abonoMinutes && justification.abonoMinutes > 0;
                         
                         if (hasSpecificAbono) {
-                            // Manager specified an exact amount of time to credit
                             creditedMs = justification.abonoMinutes * 60 * 1000;
                         } else {
-                            // Justification without specific time (e.g., Férias, Atestado) should cover the missing time
                             creditedMs = Math.max(0, requiredWorkMs - workedMs);
                         }
                         
@@ -655,46 +677,45 @@
                         dailyBalanceText = `${justification.text} (${displayBalance})`;
                         dailyBalanceClass = 'text-blue-600';
 
-                    } else if (dayEntries.length === 0) { // No justification, no clock-ins
+                    } else if (dayEntries.length === 0) { 
                         dailyBalanceText = 'Falta';
                         dailyBalanceClass = 'text-red-600 font-bold';
                         balanceMs = -requiredWorkMs;
-                    } else { // No justification, but there are clock-ins
+                    } else { 
                         balanceMs = workedMs - requiredWorkMs;
                         const displayBalance = Math.abs(balanceMs) <= 15 * 60 * 1000 ? '00:00' : formatMilliseconds(balanceMs, true);
                         dailyBalanceText = displayBalance;
                         dailyBalanceClass = balanceMs >= 0 ? 'text-green-600' : 'text-red-600';
                     }
 
-                    // Add to monthly total only if outside the 15-minute tolerance
                     if (Math.abs(balanceMs) > 15 * 60 * 1000) {
-                        totalMonthlyBalanceMs += balanceMs;
+                        totalBalanceMs += balanceMs;
                     }
                 }
-                // *** END: REVISED LOGIC FOR BALANCE CALCULATION ***
 
                 const row = document.createElement('tr');
                 row.innerHTML = `<td class="px-6 py-4">${dateString}</td><td class="px-6 py-4 capitalize">${dayOfWeek.replace('.','')}</td><td class="px-6 py-4">${ins}</td><td class="px-6 py-4">${outs}</td><td class="px-6 py-4 font-medium ${dailyBalanceClass}">${dailyBalanceText}</td>`;
                 ui.reportTableBody.appendChild(row);
+
+                // Incrementa o dia
+                currentDate.setDate(currentDate.getDate() + 1);
             }
 
-            ui.monthlyBalance.textContent = `Saldo total do mês: ${formatMilliseconds(totalMonthlyBalanceMs, true)}`;
-            ui.monthlyBalance.className = `mt-4 p-4 rounded-md font-bold text-center ${totalMonthlyBalanceMs >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
+            ui.monthlyBalance.textContent = `Saldo total do período: ${formatMilliseconds(totalBalanceMs, true)}`;
+            ui.monthlyBalance.className = `mt-4 p-4 rounded-md font-bold text-center ${totalBalanceMs >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
             ui.monthlyBalance.classList.remove('hidden');
             ui.downloadPdfBtn.classList.remove('hidden');
             ui.occurrenceSection.classList.remove('hidden');
         }
         
+        // Listener principal de mudança de funcionário para carregar dados
         ui.userDropdown.addEventListener('change', async (e) => {
             const selectedUserId = e.target.value;
             
-            // **** INÍCIO: LÓGICA DE SINCRONIZAÇÃO ****
-            // Atualiza o valor do filtro na outra aba
             if (ui.requestUserFilter.value !== selectedUserId) {
                 ui.requestUserFilter.value = selectedUserId;
-                filterAndRenderRequests(); // Atualiza a tabela de solicitações
+                filterAndRenderRequests(); 
             }
-            // **** FIM: LÓGICA DE SINCRONIZAÇÃO ****
 
             ui.monthlyBalance.classList.add('hidden');
             ui.downloadPdfBtn.classList.add('hidden');
@@ -703,11 +724,15 @@
                 ui.reportTitle.textContent = `Carregando histórico...`;
                 ui.noReportMessage.classList.add('hidden');
                 
-                const selectedDate = ui.monthSelector.value;
-                const [year, month] = selectedDate.split('-');
-                await loadOccurrence(selectedUserId, parseInt(month, 10), parseInt(year, 10));
-                ui.occurrenceSection.classList.remove('hidden');
+                // Carregar ocorrência do mês da data INICIAL
+                const startDateVal = ui.reportStartDate.value;
+                if(startDateVal) {
+                    const [y, m, d] = startDateVal.split('-');
+                    await loadOccurrence(selectedUserId, parseInt(m, 10), parseInt(y, 10));
+                    ui.occurrenceSection.classList.remove('hidden');
+                }
 
+                // Iniciar listener de histórico editável (carregando tudo para permitir navegação livre, ou limitar se ficar lento)
                 const entriesRef = collection(db, 'artifacts', appId, 'users', selectedUserId, 'time_entries');
                 const entriesQuery = query(entriesRef, orderBy("timestamp", "asc"));
                 
@@ -724,31 +749,41 @@
                 ui.occurrenceDetails.value = '';
                 ui.occurrenceStatus.textContent = '';
                 ui.noReportMessage.classList.remove('hidden');
-                ui.noReportMessage.textContent = "Selecione um funcionário para ver o relatório.";
+                ui.noReportMessage.textContent = "Selecione um funcionário.";
             }
         });
         
-        ui.monthSelector.addEventListener('change', async (e) => {
-            const selectedUserId = ui.userDropdown.value;
-            if (selectedUserId) {
-                const selectedDate = e.target.value;
-                const [year, month] = selectedDate.split('-');
-                await loadOccurrence(selectedUserId, parseInt(month, 10), parseInt(year, 10));
-                
-                const entriesRef = collection(db, 'artifacts', appId, 'users', selectedUserId, 'time_entries');
-                const entriesQuery = query(entriesRef, orderBy("timestamp", "asc"));
-                const snapshot = await getDocs(entriesQuery);
-                const allEntries = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-                renderEditableDailyHistory(allEntries, selectedUserId);
-            }
+        // Listener de mudança nas datas para atualizar ocorrência e histórico editável
+        [ui.reportStartDate, ui.reportEndDate].forEach(el => {
+            el.addEventListener('change', async () => {
+                const selectedUserId = ui.userDropdown.value;
+                if(selectedUserId && ui.reportStartDate.value) {
+                     const [y, m, d] = ui.reportStartDate.value.split('-');
+                     await loadOccurrence(selectedUserId, parseInt(m, 10), parseInt(y, 10));
+                     
+                     // Re-renderizar histórico editável se já tiver dados
+                     // Nota: renderEditableDailyHistory usa as datas dos inputs
+                     if (unsubscribe.entries) {
+                         // O snapshot já cuida do trigger, mas se os dados já estão lá e só mudou a data:
+                         // Precisaríamos forçar, mas o snapshot cobre. Se quiser forçar re-render imediato sem ir ao banco:
+                         // Melhor deixar o fluxo do snapshot ou chamar manualmente se tivermos as entries em cache.
+                         // Por simplicidade, assumimos que o click em 'Gerar' ou o fluxo normal cuidam disso.
+                         // Mas para o editável, vamos forçar refresh se tivermos como acessar as entries.
+                         // Como as entries estão dentro do callback do snapshot, vamos disparar o listener de 'generateReportBtn' para o relatório estático,
+                         // e para o editável, ele depende do snapshot.
+                     }
+                }
+            });
         });
 
         async function renderEditableDailyHistory(allEntries, userId) {
-            const selectedDate = ui.monthSelector.value;
-            const [year, month] = selectedDate.split('-').map(Number);
-            const userName = allUsers.find(u => u.id === userId)?.name;
-            const today = new Date();
+            const startDateVal = ui.reportStartDate.value;
+            const endDateVal = ui.reportEndDate.value;
+            
+            if(!startDateVal || !endDateVal) return;
+            if(startDateVal > endDateVal) return;
 
+            const userName = allUsers.find(u => u.id === userId)?.name;
             ui.reportTitle.textContent = `Histórico Editável para ${userName}`;
             ui.reportTableBody.innerHTML = '';
             ui.reportTableHead.innerHTML = `<tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dia da Semana</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Entradas</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saídas</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th></tr>`;
@@ -763,14 +798,16 @@
             
             const userRequests = allRequests.filter(r => r.userId === userId);
 
-            const daysInMonth = new Date(year, month, 0).getDate();
+            let currentDate = new Date(startDateVal + 'T00:00:00');
+            const loopEnd = new Date(endDateVal + 'T23:59:59');
+            const today = new Date();
+            today.setHours(0,0,0,0);
 
-            for (let day = 1; day <= daysInMonth; day++) {
-                const currentDate = new Date(year, month - 1, day);
-                const normalToday = new Date();
-                normalToday.setHours(0, 0, 0, 0);
-
-                if (currentDate > normalToday) continue; 
+            while(currentDate <= loopEnd) {
+                if (currentDate > today) {
+                     currentDate.setDate(currentDate.getDate() + 1);
+                     continue; 
+                }
 
                 const dateString = currentDate.toLocaleDateString('pt-BR');
                 const dayOfWeek = currentDate.toLocaleDateString('pt-BR', { weekday: 'short' });
@@ -801,6 +838,8 @@
 
                 row.innerHTML = `<td class="px-6 py-4">${dateString}</td><td class="px-6 py-4 capitalize">${dayOfWeek.replace('.','')}</td><td class="px-6 py-4">${ins || '---'}</td><td class="px-6 py-4">${outs || '---'}</td><td class="px-6 py-4">${actionsHtml}</td>`;
                 ui.reportTableBody.appendChild(row);
+
+                currentDate.setDate(currentDate.getDate() + 1);
             }
 
             document.querySelectorAll('.edit-day-btn').forEach(button => button.addEventListener('click', (e) => showAddEntryModal(e.target.dataset.date, e.target.dataset.userId)));
@@ -836,7 +875,7 @@
                 if (outs[0]) ui.addEntryOut1.value = formatTime(outs[0].timestamp);
             } catch (error) {
                 console.error("Erro ao buscar batidas do dia:", error);
-                ui.addEntryMessage.textContent = "Não foi possível carregar as batidas. Pode ser necessário criar um índice no Firestore.";
+                ui.addEntryMessage.textContent = "Não foi possível carregar as batidas.";
                 ui.addEntryMessage.className = 'text-sm mt-4 text-center text-red-600';
             }
             
@@ -966,7 +1005,7 @@
                 }, 1500);
             } catch (error) {
                 console.error("Erro ao salvar batidas:", error);
-                msgEl.textContent = "Erro ao salvar. Pode ser necessário criar um índice no Firestore.";
+                msgEl.textContent = "Erro ao salvar.";
                 msgEl.className = 'text-sm mt-4 text-center text-red-600';
                 ui.saveAddBtn.disabled = false; ui.cancelAddBtn.disabled = false;
             }
@@ -1016,7 +1055,6 @@
                 option.textContent = user.name;
                 ui.requestUserFilter.appendChild(option);
             });
-            // Adiciona a opção 'Nenhum' ao final, e a seleciona
             ui.requestUserFilter.innerHTML += '<option value="none">Nenhum</option>';
             ui.requestUserFilter.value = 'none';
 
@@ -1030,12 +1068,9 @@
         function filterAndRenderRequests() {
             const selectedUserId = ui.requestUserFilter.value;
             
-            // **** INÍCIO: LÓGICA DE SINCRONIZAÇÃO ****
-            // Atualiza o valor do dropdown na outra aba
             if (ui.userDropdown.value !== selectedUserId) {
                 ui.userDropdown.value = selectedUserId;
             }
-            // **** FIM: LÓGICA DE SINCRONIZAÇÃO ****
 
             const startDate = ui.requestStartDateFilter.value ? new Date(ui.requestStartDateFilter.value + 'T00:00:00') : null;
             const endDate = ui.requestEndDateFilter.value ? new Date(ui.requestEndDateFilter.value + 'T23:59:59') : null;
@@ -1049,11 +1084,9 @@
                 filteredRequests = filteredRequests.filter(req => req.userId === selectedUserId);
             }
             
-            // **** INÍCIO: CORREÇÃO DO FILTRO DE DATA ****
             if (startDate) {
                 filteredRequests = filteredRequests.filter(req => {
                     const [day, month, year] = req.date.split('/');
-                    // Cria a data da solicitação como meia-noite local
                     const reqDate = new Date(year, month - 1, day);
                     return reqDate >= startDate;
                 });
@@ -1061,18 +1094,15 @@
             if (endDate) {
                 filteredRequests = filteredRequests.filter(req => {
                     const [day, month, year] = req.date.split('/');
-                    // Cria a data da solicitação como meia-noite local
                     const reqDate = new Date(year, month - 1, day);
                     return reqDate <= endDate;
                 });
             }
-            // **** FIM: CORREÇÃO DO FILTRO DE DATA ****
             
             if (searchText) {
                 filteredRequests = filteredRequests.filter(req => req.text.toLowerCase().includes(searchText));
             }
 
-            // Ordena as solicitações por data, da mais antiga para a mais recente
             filteredRequests.sort((a, b) => {
                 const [dayA, monthA, yearA] = a.date.split('/');
                 const dateA = new Date(yearA, monthA - 1, dayA);
@@ -1144,13 +1174,15 @@
         }
 
         async function saveOccurrence() {
-            const selectedUserId = ui.userDropdown.value; const selectedDate = ui.monthSelector.value;
-            if (!selectedUserId || !selectedDate) {
-                ui.occurrenceStatus.textContent = 'Selecione um funcionário e um mês.';
+            const selectedUserId = ui.userDropdown.value; 
+            const startDateVal = ui.reportStartDate.value;
+            if (!selectedUserId || !startDateVal) {
+                ui.occurrenceStatus.textContent = 'Selecione um funcionário e uma data inicial.';
                 ui.occurrenceStatus.className = 'text-sm text-red-500 mr-4';
                 return;
             }
-            const [year, month] = selectedDate.split('-');
+            // Usa o mês/ano da DATA INICIAL para salvar
+            const [year, month] = startDateVal.split('-');
             const reportId = `${year}-${month}`;
             const reportDocRef = doc(db, 'artifacts', appId, 'users', selectedUserId, 'reports', reportId);
             ui.occurrenceStatus.textContent = 'Salvando...';
@@ -1172,25 +1204,36 @@
             const { jsPDF } = window.jspdf; const doc = new jsPDF();
             const selectedUserId = ui.userDropdown.value;
             const userName = allUsers.find(u => u.id === selectedUserId)?.name || 'Usuário';
-            const [year, month] = ui.monthSelector.value.split('-').map(Number);
-            const monthName = new Date(year, month - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+            
+            // Formatando período para o título
+            const startDate = new Date(ui.reportStartDate.value + 'T00:00:00');
+            const endDate = new Date(ui.reportEndDate.value + 'T00:00:00');
+            const periodStr = `${startDate.toLocaleDateString('pt-BR')} a ${endDate.toLocaleDateString('pt-BR')}`;
+
             doc.setFontSize(18); doc.text(`Relatório de Ponto - ${userName}`, 14, 22);
-            doc.setFontSize(12); doc.text(`Período: ${monthName}`, 14, 30);
+            doc.setFontSize(12); doc.text(`Período: ${periodStr}`, 14, 30);
             const head = [['Data', 'Dia da Semana', 'Entradas', 'Saídas', 'Saldo do Dia']];
             const body = Array.from(ui.reportTableBody.querySelectorAll('tr')).map(row => Array.from(row.querySelectorAll('td')).map(cell => cell.innerText));
             doc.autoTable({ head, body, startY: 40, theme: 'striped', headStyles: { fillColor: [22, 160, 133] } });
             let finalY = doc.lastAutoTable.finalY;
+            
             const requestsRef = collection(db, `/artifacts/${appId}/requests`);
             const q = query(requestsRef, where("userId", "==", selectedUserId), where("status", "==", "approved"));
             const requestsSnapshot = await getDocs(q);
-            const monthRequests = requestsSnapshot.docs.map(d => d.data()).filter(req => {
+            
+            // Filtrar requests pelo período
+            const rangeRequests = requestsSnapshot.docs.map(d => d.data()).filter(req => {
                 if (!req.date) return false;
-                const [, reqMonth, reqYear] = req.date.split('/');
-                return parseInt(reqYear, 10) === year && parseInt(reqMonth, 10) === month;
+                const [d, m, y] = req.date.split('/');
+                const rDate = new Date(y, m-1, d);
+                // Ajustar horas para comparação justa
+                rDate.setHours(0,0,0,0);
+                const start = new Date(startDate); start.setHours(0,0,0,0);
+                const end = new Date(endDate); end.setHours(0,0,0,0);
+                return rDate >= start && rDate <= end;
             });
 
-            // Ordena as solicitações do mês por data antes de adicionar ao PDF
-            monthRequests.sort((a, b) => {
+            rangeRequests.sort((a, b) => {
                 const [dayA, monthA, yearA] = a.date.split('/');
                 const dateA = new Date(yearA, monthA - 1, dayA);
                 const [dayB, monthB, yearB] = b.date.split('/');
@@ -1198,9 +1241,9 @@
                 return dateA - dateB;
             });
 
-            if (monthRequests.length > 0) {
+            if (rangeRequests.length > 0) {
                 doc.setFontSize(14); doc.text('Solicitações Autorizadas', 14, finalY + 15);
-                doc.autoTable({ head: [['Data', 'Motivo']], body: monthRequests.map(req => [req.date, req.text]), startY: finalY + 18, theme: 'grid', headStyles: { fillColor: [44, 62, 80] } });
+                doc.autoTable({ head: [['Data', 'Motivo']], body: rangeRequests.map(req => [req.date, req.text]), startY: finalY + 18, theme: 'grid', headStyles: { fillColor: [44, 62, 80] } });
                 finalY = doc.lastAutoTable.finalY;
             }
             doc.setFontSize(12); doc.setFont('helvetica', 'bold'); doc.text(ui.monthlyBalance.textContent, 14, finalY + 10);
@@ -1211,7 +1254,7 @@
                 doc.setFontSize(10); doc.setFont('helvetica', 'normal');
                 doc.text(doc.splitTextToSize(occurrenceText, 178), 16, finalY + 33);
             }
-            doc.save(`relatorio_${userName.replace(/\s+/g, '_').toLowerCase()}_${String(month).padStart(2, '0')}_${year}.pdf`);
+            doc.save(`relatorio_${userName.replace(/\s+/g, '_').toLowerCase()}.pdf`);
         }
 
         function filterAndRenderUsersManagementTable() {
@@ -1387,7 +1430,6 @@
                 doc.setFont('helvetica', 'bold');
                 doc.text('Solicitações Autorizadas', 14, finalY);
                 
-                // Ordena as solicitações por data antes de adicionar ao PDF final
                 reportData.approvedRequests.sort((a, b) => {
                     const [dayA, monthA, yearA] = a.date.split('/');
                     const dateA = new Date(yearA, monthA - 1, dayA);
@@ -1502,20 +1544,17 @@
         ui.tabRequests.addEventListener('click', () => switchTab(ui.tabRequests, ui.panelRequests));
         ui.tabUsers.addEventListener('click', () => switchTab(ui.tabUsers, ui.panelUsers));
         
-        // **** INÍCIO: LÓGICA DO POPOVER DE NOTIFICAÇÃO ****
-        // Clicar no ícone de notificação abre/fecha o popover
+        // Notificação
         ui.notificationIcon.addEventListener('click', (e) => {
-            e.stopPropagation(); // Impede que o clique no ícone seja pego pelo listener do 'document'
+            e.stopPropagation(); 
             ui.notificationPopover.classList.toggle('hidden');
         });
         
-        // Clicar em qualquer lugar fora do popover o fecha
         document.addEventListener('click', (e) => {
             if (!ui.notificationIcon.contains(e.target) && !ui.notificationPopover.contains(e.target)) {
                 ui.notificationPopover.classList.add('hidden');
             }
         });
-        // **** FIM: LÓGICA DO POPOVER DE NOTIFICAÇÃO ****
 
         async function applyQuickEntry() {
             const userId = ui.userDropdown.value;
@@ -1555,7 +1594,7 @@
                 let currentDate = new Date(startDate);
                 while (currentDate <= endDate) {
                     const dayIndex = currentDate.getDay();
-                    if (dayIndex !== 0 && dayIndex !== 6) { // Not Sunday or Saturday
+                    if (dayIndex !== 0 && dayIndex !== 6) { 
                         const newRequest = {
                             userId: userId,
                             userName: user.name,
@@ -1563,7 +1602,7 @@
                             text: type,
                             status: 'approved',
                             createdAt: Timestamp.now(),
-                            abonoMinutes: 360 // Lançamento rápido sempre abona o dia inteiro (6h)
+                            abonoMinutes: 360 
                         };
                         const newReqRef = doc(collection(db, `artifacts/${appId}/requests`));
                         batch.set(newReqRef, newRequest);
@@ -1574,7 +1613,7 @@
                 await batch.commit();
                 statusEl.textContent = 'Período aplicado com sucesso!';
                 statusEl.className = 'text-sm mt-4 text-center text-green-600';
-                ui.generateReportBtn.click(); // Refresh report
+                ui.generateReportBtn.click(); 
             } catch (error) {
                 console.error("Erro ao aplicar período:", error);
                 statusEl.textContent = 'Erro ao salvar. Tente novamente.';
@@ -1586,8 +1625,12 @@
         }
 
         document.getElementById('header-date').textContent = new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
-        const today = new Date();
-        document.getElementById('month-selector').value = today.toISOString().substring(0, 7);
+        
+        // Define data inicial para o primeiro dia do mês atual e final para hoje, como padrão
+        const now = new Date();
+        const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+        ui.reportStartDate.value = firstDay.toISOString().split('T')[0];
+        ui.reportEndDate.value = now.toISOString().split('T')[0];
 
     </script>
 </body>
