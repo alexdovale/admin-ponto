@@ -673,7 +673,7 @@
                         
                         balanceMs = (workedMs + creditedMs) - requiredWorkMs;
 
-                        const displayBalance = Math.abs(balanceMs) <= 15 * 60 * 1000 ? '00:00' : formatMilliseconds(balanceMs, true);
+                        const displayBalance = Math.abs(balanceMs) <= toleranceMs ? '00:00' : formatMilliseconds(balanceMs, true);
                         dailyBalanceText = `${justification.text} (${displayBalance})`;
                         dailyBalanceClass = 'text-blue-600';
 
@@ -687,9 +687,10 @@
                         dailyBalanceText = displayBalance;
                         dailyBalanceClass = balanceMs >= 0 ? 'text-green-600' : 'text-red-600';
                     }
-
-                    if (Math.abs(balanceMs) > 15 * 60 * 1000) {
-                        totalBalanceMs += balanceMs;
+                    const toleranceMs = (15 * 60 * 1000) + (59 * 1000); // 15 min + 59 seg
+                    
+                    if (Math.abs(balanceMs) > toleranceMs) {
+                            totalBalanceMs += balanceMs;
                     }
                 }
 
@@ -1373,10 +1374,12 @@
                         }
                         totalWorkedMs += dailyWorkedMs;
                         const dailyBalanceMs = dailyWorkedMs - (6 * 3600 * 1000);
-                        if (Math.abs(dailyBalanceMs) > (15 * 60 * 1000)) {
+                        const toleranceMs = (15 * 60 * 1000) + (59 * 1000); // 15 min + 59 seg
+                        
+                        if (Math.abs(dailyBalanceMs) > toleranceMs) {
                             totalBalanceMs += dailyBalanceMs;
                         }
-                        dailyBalanceText = Math.abs(dailyBalanceMs) <= (15 * 60 * 1000) ? '00:00' : formatMilliseconds(dailyBalanceMs, true);
+                        dailyBalanceText = Math.abs(dailyBalanceMs) <= toleranceMs ? '00:00' : formatMilliseconds(dailyBalanceMs, true);
                     } else {
                         dailyBalanceText = 'Batida Ímpar';
                     }
@@ -1635,3 +1638,4 @@
     </script>
 </body>
 </html>
+
