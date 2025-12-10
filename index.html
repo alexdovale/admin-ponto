@@ -532,6 +532,12 @@
             const startDateVal = ui.reportStartDate.value;
             const endDateVal = ui.reportEndDate.value;
 
+            // Importante: Cancelar o listener do 'editável' para não sobrescrever o relatório estático
+            if (unsubscribe.entries) {
+                unsubscribe.entries();
+                unsubscribe.entries = null;
+            }
+
             if (selectedUserId && startDateVal && endDateVal) {
                 if(startDateVal > endDateVal) {
                     alert('A data final deve ser posterior à data inicial.');
@@ -562,29 +568,37 @@
             ui.noReportMessage.classList.add('hidden');
 
             const entriesRef = collection(db, 'artifacts', appId, 'users', userId, 'time_entries');
-            // Busca apenas entradas dentro do range de datas (requer índice composto ou filtro em memória se pequeno)
-            // Para garantir, vamos buscar ordenado e filtrar no client-side ou usar filtro composto
-            const entriesQuery = query(entriesRef, 
-                where("timestamp", ">=", Timestamp.fromDate(startDate)),
-                where("timestamp", "<=", Timestamp.fromDate(endDate)),
-                orderBy("timestamp", "asc")
-            );
             
+            // Tentativa de busca otimizada (requer índice) ou fallback para busca total
             try {
+                // Tenta busca com filtro composto
+                const entriesQuery = query(entriesRef, 
+                    where("timestamp", ">=", Timestamp.fromDate(startDate)),
+                    where("timestamp", "<=", Timestamp.fromDate(endDate)),
+                    orderBy("timestamp", "asc")
+                );
                 const entriesSnapshot = await getDocs(entriesQuery);
                 const filteredEntries = entriesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
                 await renderReportTable(filteredEntries, userId, startDate, endDate);
             } catch(e) {
-                console.error("Erro na query de datas. Verifique índices.", e);
-                // Fallback: carregar tudo e filtrar (menos eficiente, mas robusto sem índices)
-                const qAll = query(entriesRef, orderBy("timestamp", "asc"));
-                const snapAll = await getDocs(qAll);
-                const all = snapAll.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-                const filtered = all.filter(e => {
-                    const d = e.timestamp.toDate();
-                    return d >= startDate && d <= endDate;
-                });
-                await renderReportTable(filtered, userId, startDate, endDate);
+                console.log("Índice não encontrado ou erro na query composta. Usando fallback de ordenação simples.", e);
+                // Fallback: Busca tudo ordenado e filtra no cliente (garante funcionamento sem índice composto)
+                try {
+                    const qAll = query(entriesRef, orderBy("timestamp", "asc"));
+                    const snapAll = await getDocs(qAll);
+                    const all = snapAll.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+                    
+                    // Filtra em memória para garantir precisão
+                    const filtered = all.filter(e => {
+                        if (!e.timestamp) return false;
+                        const d = e.timestamp.toDate();
+                        return d >= startDate && d <= endDate;
+                    });
+                    await renderReportTable(filtered, userId, startDate, endDate);
+                } catch (err2) {
+                     console.error("Erro fatal ao buscar dados:", err2);
+                     ui.reportTitle.textContent = `Erro ao carregar dados.`;
+                }
             }
         }
 
@@ -599,107 +613,133 @@
             ui.reportTableHead.innerHTML = `<tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dia da Semana</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Entradas</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saídas</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saldo do Dia</th></tr>`;
             ui.noReportMessage.classList.add('hidden');
             
+            // Busca justificativas
             const requestsRef = collection(db, `/artifacts/${appId}/requests`);
             const q = query(requestsRef, where("userId", "==", userId), where("status", "==", "approved"));
-            const requestsSnapshot = await getDocs(q);
-            const approvedRequests = {};
-            requestsSnapshot.docs.forEach(doc => {
-                const req = doc.data();
-                if (req.date) {
-                    approvedRequests[req.date] = req; // req.date já está em DD/MM/YYYY
-                }
-            });
+            let approvedRequests = {};
+            try {
+                const requestsSnapshot = await getDocs(q);
+                requestsSnapshot.docs.forEach(doc => {
+                    const req = doc.data();
+                    if (req.date) {
+                        approvedRequests[req.date] = req; 
+                    }
+                });
+            } catch(e) {
+                console.error("Erro ao buscar justificativas", e);
+            }
 
+            // Organiza entradas por dia (DD/MM/YYYY)
             const entriesByDay = entries.reduce((acc, entry) => {
-                const date = entry.timestamp.toDate().toLocaleDateString('pt-BR');
-                if (!acc[date]) acc[date] = [];
-                acc[date].push(entry);
+                try {
+                    if (entry.timestamp) {
+                        const date = entry.timestamp.toDate().toLocaleDateString('pt-BR');
+                        if (!acc[date]) acc[date] = [];
+                        acc[date].push(entry);
+                    }
+                } catch(e) { console.error("Erro ao processar entrada:", entry); }
                 return acc;
             }, {});
 
             let totalBalanceMs = 0;
             const requiredWorkMs = 6 * 3600 * 1000;
 
-            let currentDate = new Date(startDate);
-            // Zera hora para garantir loop correto
-            currentDate.setHours(0,0,0,0);
-            const loopEnd = new Date(endDate);
-            loopEnd.setHours(23,59,59,999);
+            // --- LÓGICA DE LOOP CORRIGIDA ---
+            // Usa cópias para não afetar as variáveis originais
+            let currentDateItr = new Date(startDate);
+            currentDateItr.setHours(0,0,0,0);
+            
+            const loopEndItr = new Date(endDate);
+            loopEndItr.setHours(23,59,59,999);
 
-            while(currentDate <= loopEnd) {
-                const dateString = currentDate.toLocaleDateString('pt-BR');
-                const dayOfWeek = currentDate.toLocaleDateString('pt-BR', { weekday: 'short' });
-                const dayIndex = currentDate.getDay();
-                const isWeekend = dayIndex === 0 || dayIndex === 6;
-                const isFutureDay = currentDate > today && currentDate.setHours(0,0,0,0) > today.setHours(0,0,0,0);
+            // Loop while seguro
+            let safetyCounter = 0;
+            while(currentDateItr <= loopEndItr && safetyCounter < 370) { // Limite de segurança aprox 1 ano
+                safetyCounter++;
                 
-                const dayEntries = entriesByDay[dateString] || [];
-                const ins = dayEntries.length > 0 ? dayEntries.filter(e => e.type === 'in').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).sort().join(', ') : '---';
-                const outs = dayEntries.length > 0 ? dayEntries.filter(e => e.type === 'out').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).sort().join(', ') : '---';
+                try {
+                    const dateString = currentDateItr.toLocaleDateString('pt-BR');
+                    const dayOfWeek = currentDateItr.toLocaleDateString('pt-BR', { weekday: 'short' });
+                    const dayIndex = currentDateItr.getDay();
+                    const isWeekend = dayIndex === 0 || dayIndex === 6;
+                    // Comparação de dia futuro segura
+                    const isFutureDay = currentDateItr > today && currentDateItr.setHours(0,0,0,0) > today.setHours(0,0,0,0);
+                    
+                    const dayEntries = entriesByDay[dateString] || [];
+                    const ins = dayEntries.length > 0 ? dayEntries.filter(e => e.type === 'in').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).sort().join(', ') : '---';
+                    const outs = dayEntries.length > 0 ? dayEntries.filter(e => e.type === 'out').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).sort().join(', ') : '---';
 
-                let dailyBalanceText = '---', dailyBalanceClass = 'text-gray-700';
+                    let dailyBalanceText = '---', dailyBalanceClass = 'text-gray-700';
 
-                if (isWeekend) {
-                    dailyBalanceText = 'Fim de Semana';
-                    dailyBalanceClass = 'text-gray-500 italic';
-                } else if (isFutureDay) {
-                    // Keeps the default '---'
-                } else if (dayEntries.length % 2 !== 0) {
-                    dailyBalanceText = 'Batida Ímpar';
-                    dailyBalanceClass = 'text-orange-500 font-bold';
-                } else {
-                    let workedMs = 0;
-                    if (dayEntries.length > 0) {
-                        const sorted = dayEntries.sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
-                        for (let i = 0; i < sorted.length; i += 2) {
-                            if (sorted[i].type === 'in' && sorted[i+1] && sorted[i+1].type === 'out') {
-                                workedMs += sorted[i+1].timestamp.toMillis() - sorted[i].timestamp.toMillis();
+                    if (isWeekend) {
+                        dailyBalanceText = 'Fim de Semana';
+                        dailyBalanceClass = 'text-gray-500 italic';
+                    } else if (isFutureDay) {
+                        // Keeps the default '---'
+                    } else if (dayEntries.length % 2 !== 0) {
+                        dailyBalanceText = 'Batida Ímpar';
+                        dailyBalanceClass = 'text-orange-500 font-bold';
+                    } else {
+                        let workedMs = 0;
+                        if (dayEntries.length > 0) {
+                            const sorted = dayEntries.sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
+                            for (let i = 0; i < sorted.length; i += 2) {
+                                if (sorted[i].type === 'in' && sorted[i+1] && sorted[i+1].type === 'out') {
+                                    workedMs += sorted[i+1].timestamp.toMillis() - sorted[i].timestamp.toMillis();
+                                }
                             }
                         }
-                    }
 
-                    const justification = approvedRequests[dateString];
-                    let creditedMs = 0;
-                    let balanceMs = 0;
-                    
-                    if (justification) {
-                        const hasSpecificAbono = justification.abonoMinutes && justification.abonoMinutes > 0;
+                        const justification = approvedRequests[dateString];
+                        let creditedMs = 0;
+                        let balanceMs = 0;
                         
-                        if (hasSpecificAbono) {
-                            creditedMs = justification.abonoMinutes * 60 * 1000;
-                        } else {
-                            creditedMs = Math.max(0, requiredWorkMs - workedMs);
+                        if (justification) {
+                            const hasSpecificAbono = justification.abonoMinutes && justification.abonoMinutes > 0;
+                            
+                            if (hasSpecificAbono) {
+                                creditedMs = justification.abonoMinutes * 60 * 1000;
+                            } else {
+                                creditedMs = Math.max(0, requiredWorkMs - workedMs);
+                            }
+                            
+                            balanceMs = (workedMs + creditedMs) - requiredWorkMs;
+
+                            const displayBalance = Math.abs(balanceMs) <= 59000 ? '00:00' : formatMilliseconds(balanceMs, true);
+                            dailyBalanceText = `${justification.text} (${displayBalance})`;
+                            dailyBalanceClass = 'text-blue-600';
+
+                        } else if (dayEntries.length === 0) { 
+                            dailyBalanceText = 'Falta';
+                            dailyBalanceClass = 'text-red-600 font-bold';
+                            balanceMs = -requiredWorkMs;
+                        } else { 
+                            balanceMs = workedMs - requiredWorkMs;
+                            const displayBalance = Math.abs(balanceMs) <= 15 * 60 * 1000 ? '00:00' : formatMilliseconds(balanceMs, true);
+                            dailyBalanceText = displayBalance;
+                            dailyBalanceClass = balanceMs >= 0 ? 'text-green-600' : 'text-red-600';
                         }
+                        const toleranceMs = (15 * 60 * 1000) + (59 * 1000); // 15 min + 59 seg
                         
-                        balanceMs = (workedMs + creditedMs) - requiredWorkMs;
-
-                        const displayBalance = Math.abs(balanceMs) <= toleranceMs ? '00:00' : formatMilliseconds(balanceMs, true);
-                        dailyBalanceText = `${justification.text} (${displayBalance})`;
-                        dailyBalanceClass = 'text-blue-600';
-
-                    } else if (dayEntries.length === 0) { 
-                        dailyBalanceText = 'Falta';
-                        dailyBalanceClass = 'text-red-600 font-bold';
-                        balanceMs = -requiredWorkMs;
-                    } else { 
-                        balanceMs = workedMs - requiredWorkMs;
-                        const displayBalance = Math.abs(balanceMs) <= 15 * 60 * 1000 ? '00:00' : formatMilliseconds(balanceMs, true);
-                        dailyBalanceText = displayBalance;
-                        dailyBalanceClass = balanceMs >= 0 ? 'text-green-600' : 'text-red-600';
+                        // Proteção contra NaN no saldo
+                        if (!isNaN(balanceMs) && Math.abs(balanceMs) > toleranceMs) {
+                                totalBalanceMs += balanceMs;
+                        }
                     }
-                    const toleranceMs = (15 * 60 * 1000) + (59 * 1000); // 15 min + 59 seg
-                    
-                    if (Math.abs(balanceMs) > toleranceMs) {
-                            totalBalanceMs += balanceMs;
-                    }
+
+                    const row = document.createElement('tr');
+                    row.innerHTML = `<td class="px-6 py-4">${dateString}</td><td class="px-6 py-4 capitalize">${dayOfWeek.replace('.','')}</td><td class="px-6 py-4">${ins}</td><td class="px-6 py-4">${outs}</td><td class="px-6 py-4 font-medium ${dailyBalanceClass}">${dailyBalanceText}</td>`;
+                    ui.reportTableBody.appendChild(row);
+
+                } catch (errRow) {
+                    console.error(`Erro ao renderizar linha para data ${currentDateItr}`, errRow);
+                    const row = document.createElement('tr');
+                    row.innerHTML = `<td class="px-6 py-4 text-red-500">Erro na data</td><td colspan="4">Dados inválidos</td>`;
+                    ui.reportTableBody.appendChild(row);
                 }
 
-                const row = document.createElement('tr');
-                row.innerHTML = `<td class="px-6 py-4">${dateString}</td><td class="px-6 py-4 capitalize">${dayOfWeek.replace('.','')}</td><td class="px-6 py-4">${ins}</td><td class="px-6 py-4">${outs}</td><td class="px-6 py-4 font-medium ${dailyBalanceClass}">${dailyBalanceText}</td>`;
-                ui.reportTableBody.appendChild(row);
-
-                // Incrementa o dia
-                currentDate.setDate(currentDate.getDate() + 1);
+                // Incrementa o dia de forma segura para o próximo loop
+                currentDateItr.setDate(currentDateItr.getDate() + 1);
             }
 
             ui.monthlyBalance.textContent = `Saldo total do período: ${formatMilliseconds(totalBalanceMs, true)}`;
@@ -728,12 +768,12 @@
                 // Carregar ocorrência do mês da data INICIAL
                 const startDateVal = ui.reportStartDate.value;
                 if(startDateVal) {
-                    const [y, m, d] = startDateVal.split('-');
-                    await loadOccurrence(selectedUserId, parseInt(m, 10), parseInt(y, 10));
-                    ui.occurrenceSection.classList.remove('hidden');
+                     const [y, m, d] = startDateVal.split('-');
+                     await loadOccurrence(selectedUserId, parseInt(m, 10), parseInt(y, 10));
+                     ui.occurrenceSection.classList.remove('hidden');
                 }
 
-                // Iniciar listener de histórico editável (carregando tudo para permitir navegação livre, ou limitar se ficar lento)
+                // Iniciar listener de histórico editável
                 const entriesRef = collection(db, 'artifacts', appId, 'users', selectedUserId, 'time_entries');
                 const entriesQuery = query(entriesRef, orderBy("timestamp", "asc"));
                 
@@ -762,22 +802,21 @@
                      const [y, m, d] = ui.reportStartDate.value.split('-');
                      await loadOccurrence(selectedUserId, parseInt(m, 10), parseInt(y, 10));
                      
-                     // Re-renderizar histórico editável se já tiver dados
-                     // Nota: renderEditableDailyHistory usa as datas dos inputs
-                     if (unsubscribe.entries) {
-                         // O snapshot já cuida do trigger, mas se os dados já estão lá e só mudou a data:
-                         // Precisaríamos forçar, mas o snapshot cobre. Se quiser forçar re-render imediato sem ir ao banco:
-                         // Melhor deixar o fluxo do snapshot ou chamar manualmente se tivermos as entries em cache.
-                         // Por simplicidade, assumimos que o click em 'Gerar' ou o fluxo normal cuidam disso.
-                         // Mas para o editável, vamos forçar refresh se tivermos como acessar as entries.
-                         // Como as entries estão dentro do callback do snapshot, vamos disparar o listener de 'generateReportBtn' para o relatório estático,
-                         // e para o editável, ele depende do snapshot.
+                     // Se tivermos dados em cache (via snapshot), re-renderizamos
+                     // Isso é útil apenas se o usuário NÃO clicou em gerar relatório estático ainda
+                     if(unsubscribe.entries) {
+                        // Não temos acesso direto aos dados do snapshot aqui sem armazenar em variável global,
+                        // mas o fluxo normal é o usuário interagir com o dropdown ou gerar relatório.
+                        // Para o 'editável', ele se atualiza ao trocar de usuário ou dados mudarem.
                      }
                 }
             });
         });
 
         async function renderEditableDailyHistory(allEntries, userId) {
+            // Se o listener foi cancelado (porque geramos um relatório estático), não faz nada
+            if (!unsubscribe.entries) return;
+
             const startDateVal = ui.reportStartDate.value;
             const endDateVal = ui.reportEndDate.value;
             
@@ -791,9 +830,11 @@
             ui.noReportMessage.classList.add('hidden');
             
             const entriesByDay = allEntries.reduce((acc, entry) => {
-                const date = entry.timestamp.toDate().toLocaleDateString('pt-BR');
-                if (!acc[date]) acc[date] = [];
-                acc[date].push(entry);
+                if (entry.timestamp) {
+                    const date = entry.timestamp.toDate().toLocaleDateString('pt-BR');
+                    if (!acc[date]) acc[date] = [];
+                    acc[date].push(entry);
+                }
                 return acc;
             }, {});
             
@@ -804,7 +845,10 @@
             const today = new Date();
             today.setHours(0,0,0,0);
 
-            while(currentDate <= loopEnd) {
+            let safety = 0;
+            while(currentDate <= loopEnd && safety < 370) {
+                safety++;
+                // Lógica original de pular dias futuros no EDITÁVEL mantida
                 if (currentDate > today) {
                      currentDate.setDate(currentDate.getDate() + 1);
                      continue; 
@@ -1156,6 +1200,7 @@
         }
 
         function formatMilliseconds(ms, showSign = false) {
+            if (isNaN(ms)) return "00:00";
             const isNegative = ms < 0; if (isNegative) ms = -ms;
             const hours = Math.floor(ms / 3600000);
             const minutes = Math.floor((ms % 3600000) / 60000);
@@ -1638,4 +1683,3 @@
     </script>
 </body>
 </html>
-
