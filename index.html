@@ -722,7 +722,8 @@
                         const toleranceMs = (15 * 60 * 1000) + (59 * 1000); // 15 min + 59 seg
                         
                         // Proteção contra NaN no saldo
-                        if (!isNaN(balanceMs) && Math.abs(balanceMs) > toleranceMs) {
+                        // ALTERADO: O saldo total agora considera todos os saldos diários (sem tolerância)
+                        if (!isNaN(balanceMs)) {
                                 totalBalanceMs += balanceMs;
                         }
                     }
@@ -1683,3 +1684,4 @@
     </script>
 </body>
 </html>
+--- END OF FILE index - 2025-12-10T093244.979.html ---
