@@ -162,9 +162,23 @@
                         <div>
                             <h3 class="text-lg font-medium">Solicitações de Funcionários</h3>
                             <div class="my-4 flex flex-wrap gap-4 items-center p-4 bg-gray-50 rounded-lg">
+                                <!-- Novo Filtro: Status do Usuário -->
+                                <select id="request-user-status-filter" class="p-2 border rounded-md flex-grow sm:flex-grow-0" title="Status do Funcionário">
+                                    <option value="active" selected>Ativos</option>
+                                    <option value="inactive">Inativos</option>
+                                    <option value="all">Todos os Status</option>
+                                </select>
+                                
                                 <select id="request-user-filter" class="p-2 border rounded-md flex-grow sm:flex-grow-0"></select>
-                                <input type="date" id="request-start-date-filter" class="p-2 border rounded-md flex-grow sm:flex-grow-0">
-                                <input type="date" id="request-end-date-filter" class="p-2 border rounded-md flex-grow sm:flex-grow-0">
+                                
+                                <!-- Novo Filtro: Mês Rápido -->
+                                <input type="month" id="request-month-filter" class="p-2 border rounded-md flex-grow sm:flex-grow-0" title="Selecione um mês para filtrar rapidamente">
+                                
+                                <div class="flex items-center gap-2">
+                                    <span class="text-sm text-gray-500 hidden sm:inline">Período:</span>
+                                    <input type="date" id="request-start-date-filter" class="p-2 border rounded-md flex-grow sm:flex-grow-0">
+                                    <input type="date" id="request-end-date-filter" class="p-2 border rounded-md flex-grow sm:flex-grow-0">
+                                </div>
                                 <input type="text" id="request-search-filter" class="p-2 border rounded-md flex-grow" placeholder="Pesquisar por texto...">
                             </div>
                             <div class="mt-4 overflow-x-auto">
@@ -327,8 +341,8 @@
             reportTableHead: document.getElementById('report-table-head'),
             reportTableBody: document.getElementById('report-table-body'),
             noReportMessage: document.getElementById('no-report-message'),
-            reportStartDate: document.getElementById('report-start-date'), // NOVA REF
-            reportEndDate: document.getElementById('report-end-date'), // NOVA REF
+            reportStartDate: document.getElementById('report-start-date'), 
+            reportEndDate: document.getElementById('report-end-date'), 
             generateReportBtn: document.getElementById('generate-report-btn'),
             downloadPdfBtn: document.getElementById('download-pdf-btn'),
             monthlyBalance: document.getElementById('monthly-balance'),
@@ -374,10 +388,15 @@
             finalReportContent: document.getElementById('final-report-content'),
             closeFinalReportModal: document.getElementById('close-final-report-modal'),
             downloadFinalPdfBtn: document.getElementById('download-final-pdf-btn'),
+            
+            // Filtros de Solicitação
+            requestUserStatusFilter: document.getElementById('request-user-status-filter'),
             requestUserFilter: document.getElementById('request-user-filter'),
+            requestMonthFilter: document.getElementById('request-month-filter'),
             requestStartDateFilter: document.getElementById('request-start-date-filter'),
             requestEndDateFilter: document.getElementById('request-end-date-filter'),
             requestSearchFilter: document.getElementById('request-search-filter'),
+            
             userSearchFilter: document.getElementById('user-search-filter'),
             userStatusFilter: document.getElementById('user-status-filter'),
             quickEntryStartDate: document.getElementById('quick-entry-start-date'),
@@ -448,7 +467,7 @@
 
                 renderUserDropdown(filteredEmployees.filter(u => (u.status || 'active') === 'active'));
                 filterAndRenderUsersManagementTable();
-                setupRequestFilters(filteredEmployees);
+                setupRequestFilters();
                 
                 if (unsubscribe.requests) unsubscribe.requests();
                 const requestsRef = collection(db, `/artifacts/${appId}/requests`);
@@ -526,7 +545,7 @@
             });
         }
         
-        // --- NOVA LÓGICA DE GERAÇÃO DE RELATÓRIO ---
+        // --- LÓGICA DE GERAÇÃO DE RELATÓRIO ---
         ui.generateReportBtn.addEventListener('click', async () => {
             const selectedUserId = ui.userDropdown.value;
             const startDateVal = ui.reportStartDate.value;
@@ -569,7 +588,6 @@
 
             const entriesRef = collection(db, 'artifacts', appId, 'users', userId, 'time_entries');
             
-            // Tentativa de busca otimizada (requer índice) ou fallback para busca total
             try {
                 // Tenta busca com filtro composto
                 const entriesQuery = query(entriesRef, 
@@ -582,13 +600,12 @@
                 await renderReportTable(filteredEntries, userId, startDate, endDate);
             } catch(e) {
                 console.log("Índice não encontrado ou erro na query composta. Usando fallback de ordenação simples.", e);
-                // Fallback: Busca tudo ordenado e filtra no cliente (garante funcionamento sem índice composto)
+                // Fallback: Busca tudo ordenado e filtra no cliente
                 try {
                     const qAll = query(entriesRef, orderBy("timestamp", "asc"));
                     const snapAll = await getDocs(qAll);
                     const all = snapAll.docs.map(doc => ({ ...doc.data(), id: doc.id }));
                     
-                    // Filtra em memória para garantir precisão
                     const filtered = all.filter(e => {
                         if (!e.timestamp) return false;
                         const d = e.timestamp.toDate();
@@ -644,17 +661,14 @@
             let totalBalanceMs = 0;
             const requiredWorkMs = 6 * 3600 * 1000;
 
-            // --- LÓGICA DE LOOP CORRIGIDA ---
-            // Usa cópias para não afetar as variáveis originais
             let currentDateItr = new Date(startDate);
             currentDateItr.setHours(0,0,0,0);
             
             const loopEndItr = new Date(endDate);
             loopEndItr.setHours(23,59,59,999);
 
-            // Loop while seguro
             let safetyCounter = 0;
-            while(currentDateItr <= loopEndItr && safetyCounter < 370) { // Limite de segurança aprox 1 ano
+            while(currentDateItr <= loopEndItr && safetyCounter < 370) { 
                 safetyCounter++;
                 
                 try {
@@ -662,7 +676,6 @@
                     const dayOfWeek = currentDateItr.toLocaleDateString('pt-BR', { weekday: 'short' });
                     const dayIndex = currentDateItr.getDay();
                     const isWeekend = dayIndex === 0 || dayIndex === 6;
-                    // Comparação de dia futuro segura
                     const isFutureDay = currentDateItr > today && currentDateItr.setHours(0,0,0,0) > today.setHours(0,0,0,0);
                     
                     const dayEntries = entriesByDay[dateString] || [];
@@ -719,10 +732,7 @@
                             dailyBalanceText = displayBalance;
                             dailyBalanceClass = balanceMs >= 0 ? 'text-green-600' : 'text-red-600';
                         }
-                        const toleranceMs = (15 * 60 * 1000) + (59 * 1000); // 15 min + 59 seg
                         
-                        // Proteção contra NaN no saldo
-                        // ALTERADO: O saldo total agora considera todos os saldos diários (sem tolerância)
                         if (!isNaN(balanceMs)) {
                                 totalBalanceMs += balanceMs;
                         }
@@ -739,7 +749,6 @@
                     ui.reportTableBody.appendChild(row);
                 }
 
-                // Incrementa o dia de forma segura para o próximo loop
                 currentDateItr.setDate(currentDateItr.getDate() + 1);
             }
 
@@ -766,7 +775,6 @@
                 ui.reportTitle.textContent = `Carregando histórico...`;
                 ui.noReportMessage.classList.add('hidden');
                 
-                // Carregar ocorrência do mês da data INICIAL
                 const startDateVal = ui.reportStartDate.value;
                 if(startDateVal) {
                      const [y, m, d] = startDateVal.split('-');
@@ -774,7 +782,6 @@
                      ui.occurrenceSection.classList.remove('hidden');
                 }
 
-                // Iniciar listener de histórico editável
                 const entriesRef = collection(db, 'artifacts', appId, 'users', selectedUserId, 'time_entries');
                 const entriesQuery = query(entriesRef, orderBy("timestamp", "asc"));
                 
@@ -795,27 +802,17 @@
             }
         });
         
-        // Listener de mudança nas datas para atualizar ocorrência e histórico editável
         [ui.reportStartDate, ui.reportEndDate].forEach(el => {
             el.addEventListener('change', async () => {
                 const selectedUserId = ui.userDropdown.value;
                 if(selectedUserId && ui.reportStartDate.value) {
                      const [y, m, d] = ui.reportStartDate.value.split('-');
                      await loadOccurrence(selectedUserId, parseInt(m, 10), parseInt(y, 10));
-                     
-                     // Se tivermos dados em cache (via snapshot), re-renderizamos
-                     // Isso é útil apenas se o usuário NÃO clicou em gerar relatório estático ainda
-                     if(unsubscribe.entries) {
-                        // Não temos acesso direto aos dados do snapshot aqui sem armazenar em variável global,
-                        // mas o fluxo normal é o usuário interagir com o dropdown ou gerar relatório.
-                        // Para o 'editável', ele se atualiza ao trocar de usuário ou dados mudarem.
-                     }
                 }
             });
         });
 
         async function renderEditableDailyHistory(allEntries, userId) {
-            // Se o listener foi cancelado (porque geramos um relatório estático), não faz nada
             if (!unsubscribe.entries) return;
 
             const startDateVal = ui.reportStartDate.value;
@@ -849,7 +846,6 @@
             let safety = 0;
             while(currentDate <= loopEnd && safety < 370) {
                 safety++;
-                // Lógica original de pular dias futuros no EDITÁVEL mantida
                 if (currentDate > today) {
                      currentDate.setDate(currentDate.getDate() + 1);
                      continue; 
@@ -1093,28 +1089,67 @@
 
         ui.cancelEditBtn.addEventListener('click', () => { recordToEdit = null; ui.editModal.style.display = 'none'; });
 
-        function setupRequestFilters(users) {
+        // --- INÍCIO: NOVOS FILTROS DE SOLICITAÇÃO ---
+        function populateRequestUserDropdown() {
+            const statusFilter = ui.requestUserStatusFilter.value;
             ui.requestUserFilter.innerHTML = '<option value="">Todos os Funcionários</option>';
-            users.forEach(user => {
+            
+            const filteredForDropdown = filteredEmployees.filter(user => {
+                if (statusFilter === 'all') return true;
+                const userStatus = user.status || 'active';
+                return userStatus === statusFilter;
+            });
+
+            filteredForDropdown.forEach(user => {
                 const option = document.createElement('option');
                 option.value = user.id;
                 option.textContent = user.name;
                 ui.requestUserFilter.appendChild(option);
             });
             ui.requestUserFilter.innerHTML += '<option value="none">Nenhum</option>';
-            ui.requestUserFilter.value = 'none';
-
-
-            [ui.requestUserFilter, ui.requestStartDateFilter, ui.requestEndDateFilter, ui.requestSearchFilter].forEach(el => {
-                el.addEventListener('change', filterAndRenderRequests);
-                if (el.type === 'text' || el.type === 'date') el.addEventListener('keyup', filterAndRenderRequests);
-            });
         }
+
+        function setupRequestFilters() {
+            populateRequestUserDropdown();
+            // Default selected is "Todos", se quiser forçar pode definir aqui.
+        }
+
+        // Lógica de Mês Rápido
+        ui.requestMonthFilter.addEventListener('change', (e) => {
+            const monthVal = e.target.value; 
+            if (monthVal) {
+                const [year, month] = monthVal.split('-');
+                const firstDay = new Date(year, month - 1, 1);
+                const lastDay = new Date(year, month, 0); 
+
+                const formatNum = (num) => String(num).padStart(2, '0');
+                const startStr = `${year}-${month}-01`;
+                const endStr = `${year}-${month}-${formatNum(lastDay.getDate())}`;
+
+                ui.requestStartDateFilter.value = startStr;
+                ui.requestEndDateFilter.value = endStr;
+
+                filterAndRenderRequests();
+            }
+        });
+
+        // Event Listeners globais para os filtros de solicitação
+        ui.requestUserStatusFilter.addEventListener('change', () => {
+            populateRequestUserDropdown();
+            filterAndRenderRequests();
+        });
+
+        [ui.requestUserFilter, ui.requestStartDateFilter, ui.requestEndDateFilter].forEach(el => {
+            el.addEventListener('change', filterAndRenderRequests);
+        });
+        
+        ui.requestSearchFilter.addEventListener('keyup', filterAndRenderRequests);
 
         function filterAndRenderRequests() {
             const selectedUserId = ui.requestUserFilter.value;
+            const selectedStatus = ui.requestUserStatusFilter.value;
             
-            if (ui.userDropdown.value !== selectedUserId) {
+            if (ui.userDropdown.value !== selectedUserId && selectedUserId !== 'none' && selectedUserId !== '') {
                 ui.userDropdown.value = selectedUserId;
             }
 
@@ -1124,12 +1159,23 @@
 
             let filteredRequests = allRequests;
 
+            // Filtra primeiro pelo status selecionado (Ativo/Inativo)
+            if (selectedStatus !== 'all') {
+                filteredRequests = filteredRequests.filter(req => {
+                    const reqUser = allUsers.find(u => u.id === req.userId);
+                    const userStatus = reqUser ? (reqUser.status || 'active') : 'active';
+                    return userStatus === selectedStatus;
+                });
+            }
+
+            // Depois filtra por usuário específico
             if (selectedUserId === 'none') {
                 filteredRequests = [];
             } else if (selectedUserId) {
                 filteredRequests = filteredRequests.filter(req => req.userId === selectedUserId);
             }
             
+            // Depois por data
             if (startDate) {
                 filteredRequests = filteredRequests.filter(req => {
                     const [day, month, year] = req.date.split('/');
@@ -1145,6 +1191,7 @@
                 });
             }
             
+            // E finalmente pelo texto de busca
             if (searchText) {
                 filteredRequests = filteredRequests.filter(req => req.text.toLowerCase().includes(searchText));
             }
@@ -1159,6 +1206,7 @@
             
             renderRequestsTable(filteredRequests);
         }
+        // --- FIM: NOVOS FILTROS DE SOLICITAÇÃO ---
 
         function renderRequestsTable(requests) {
             ui.requestTableBody.innerHTML = '';
@@ -1684,4 +1732,3 @@
     </script>
 </body>
 </html>
---- END OF FILE index - 2025-12-10T093244.979.html ---
