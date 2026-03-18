@@ -93,6 +93,7 @@
                             </button>
                         </nav>
                     </div>
+                    
                     <div id="tab-panel-reports" class="tab-panel space-y-6">
                         <div>
                             <h2 class="text-xl font-bold mb-4">Relatórios de Ponto</h2>
@@ -162,7 +163,6 @@
                         <div>
                             <h3 class="text-lg font-medium">Solicitações de Funcionários</h3>
                             <div class="my-4 flex flex-wrap gap-4 items-center p-4 bg-gray-50 rounded-lg">
-                                <!-- Novo Filtro: Status do Usuário -->
                                 <select id="request-user-status-filter" class="p-2 border rounded-md flex-grow sm:flex-grow-0" title="Status do Funcionário">
                                     <option value="active" selected>Ativos</option>
                                     <option value="inactive">Inativos</option>
@@ -171,7 +171,6 @@
                                 
                                 <select id="request-user-filter" class="p-2 border rounded-md flex-grow sm:flex-grow-0"></select>
                                 
-                                <!-- Novo Filtro: Mês Rápido -->
                                 <input type="month" id="request-month-filter" class="p-2 border rounded-md flex-grow sm:flex-grow-0" title="Selecione um mês para filtrar rapidamente">
                                 
                                 <div class="flex items-center gap-2">
@@ -389,7 +388,6 @@
             closeFinalReportModal: document.getElementById('close-final-report-modal'),
             downloadFinalPdfBtn: document.getElementById('download-final-pdf-btn'),
             
-            // Filtros de Solicitação
             requestUserStatusFilter: document.getElementById('request-user-status-filter'),
             requestUserFilter: document.getElementById('request-user-filter'),
             requestMonthFilter: document.getElementById('request-month-filter'),
@@ -404,14 +402,14 @@
             quickEntryType: document.getElementById('quick-entry-type'),
             applyQuickEntryBtn: document.getElementById('apply-quick-entry-btn'),
             quickEntryStatus: document.getElementById('quick-entry-status'),
-            // Abas
+            
             tabReports: document.getElementById('tab-reports'),
             tabRequests: document.getElementById('tab-requests'),
             tabUsers: document.getElementById('tab-users'),
             panelReports: document.getElementById('tab-panel-reports'),
             panelRequests: document.getElementById('tab-panel-requests'),
             panelUsers: document.getElementById('tab-panel-users'),
-            // Notificação
+            
             notificationIcon: document.getElementById('requests-notification-icon'),
             notificationBadge: document.getElementById('requests-notification-badge'),
             notificationPopover: document.getElementById('requests-notification-popover'),
@@ -534,7 +532,6 @@
             });
         }
 
-
         function renderUserDropdown(users) {
             ui.userDropdown.innerHTML = '<option value="">Selecione um funcionário</option>';
             users.forEach(user => {
@@ -545,13 +542,11 @@
             });
         }
         
-        // --- LÓGICA DE GERAÇÃO DE RELATÓRIO ---
         ui.generateReportBtn.addEventListener('click', async () => {
             const selectedUserId = ui.userDropdown.value;
             const startDateVal = ui.reportStartDate.value;
             const endDateVal = ui.reportEndDate.value;
 
-            // Importante: Cancelar o listener do 'editável' para não sobrescrever o relatório estático
             if (unsubscribe.entries) {
                 unsubscribe.entries();
                 unsubscribe.entries = null;
@@ -589,7 +584,6 @@
             const entriesRef = collection(db, 'artifacts', appId, 'users', userId, 'time_entries');
             
             try {
-                // Tenta busca com filtro composto
                 const entriesQuery = query(entriesRef, 
                     where("timestamp", ">=", Timestamp.fromDate(startDate)),
                     where("timestamp", "<=", Timestamp.fromDate(endDate)),
@@ -600,7 +594,6 @@
                 await renderReportTable(filteredEntries, userId, startDate, endDate);
             } catch(e) {
                 console.log("Índice não encontrado ou erro na query composta. Usando fallback de ordenação simples.", e);
-                // Fallback: Busca tudo ordenado e filtra no cliente
                 try {
                     const qAll = query(entriesRef, orderBy("timestamp", "asc"));
                     const snapAll = await getDocs(qAll);
@@ -624,13 +617,19 @@
             const startStr = startDate.toLocaleDateString('pt-BR');
             const endStr = endDate.toLocaleDateString('pt-BR');
             const today = new Date();
+            today.setHours(0, 0, 0, 0);
             
             ui.reportTitle.textContent = `Relatório para ${userName} (${startStr} a ${endStr})`;
             ui.reportTableBody.innerHTML = '';
-            ui.reportTableHead.innerHTML = `<tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dia da Semana</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Entradas</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saídas</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saldo do Dia</th></tr>`;
+            ui.reportTableHead.innerHTML = `<tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dia da Semana</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Entradas</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saídas</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status / Saldo</th>
+            </tr>`;
             ui.noReportMessage.classList.add('hidden');
             
-            // Busca justificativas
             const requestsRef = collection(db, `/artifacts/${appId}/requests`);
             const q = query(requestsRef, where("userId", "==", userId), where("status", "==", "approved"));
             let approvedRequests = {};
@@ -646,7 +645,6 @@
                 console.error("Erro ao buscar justificativas", e);
             }
 
-            // Organiza entradas por dia (DD/MM/YYYY)
             const entriesByDay = entries.reduce((acc, entry) => {
                 try {
                     if (entry.timestamp) {
@@ -660,12 +658,13 @@
 
             let totalBalanceMs = 0;
             const requiredWorkMs = 6 * 3600 * 1000;
+            const toleranceMs = (15 * 60 * 1000) + (59 * 1000);
 
             let currentDateItr = new Date(startDate);
-            currentDateItr.setHours(0,0,0,0);
+            currentDateItr.setHours(0, 0, 0, 0);
             
             const loopEndItr = new Date(endDate);
-            loopEndItr.setHours(23,59,59,999);
+            loopEndItr.setHours(23, 59, 59, 999);
 
             let safetyCounter = 0;
             while(currentDateItr <= loopEndItr && safetyCounter < 370) { 
@@ -676,76 +675,96 @@
                     const dayOfWeek = currentDateItr.toLocaleDateString('pt-BR', { weekday: 'short' });
                     const dayIndex = currentDateItr.getDay();
                     const isWeekend = dayIndex === 0 || dayIndex === 6;
-                    const isFutureDay = currentDateItr > today && currentDateItr.setHours(0,0,0,0) > today.setHours(0,0,0,0);
+                    const isFutureDay = currentDateItr > today;
                     
                     const dayEntries = entriesByDay[dateString] || [];
-                    const ins = dayEntries.length > 0 ? dayEntries.filter(e => e.type === 'in').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).sort().join(', ') : '---';
-                    const outs = dayEntries.length > 0 ? dayEntries.filter(e => e.type === 'out').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).sort().join(', ') : '---';
-
-                    let dailyBalanceText = '---', dailyBalanceClass = 'text-gray-700';
-
+                    const hasEntries = dayEntries.length > 0;
+                    
+                    const justification = approvedRequests[dateString];
+                    const isJustified = !!justification;
+                    
+                    let ins = '---';
+                    let outs = '---';
+                    let statusText = '---';
+                    let statusClass = 'text-gray-700';
+                    let dailyBalanceMs = 0;
+                    
                     if (isWeekend) {
-                        dailyBalanceText = 'Fim de Semana';
-                        dailyBalanceClass = 'text-gray-500 italic';
+                        statusText = 'Fim de Semana';
+                        statusClass = 'text-gray-500 italic';
                     } else if (isFutureDay) {
-                        // Keeps the default '---'
-                    } else if (dayEntries.length % 2 !== 0) {
-                        dailyBalanceText = 'Batida Ímpar';
-                        dailyBalanceClass = 'text-orange-500 font-bold';
+                        statusText = '---';
+                        statusClass = 'text-gray-700';
                     } else {
                         let workedMs = 0;
-                        if (dayEntries.length > 0) {
-                            const sorted = dayEntries.sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
+                        if (hasEntries) {
+                            const sorted = [...dayEntries].sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
+                            ins = sorted.filter(e => e.type === 'in')
+                                .map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
+                                .join(', ') || '---';
+                            outs = sorted.filter(e => e.type === 'out')
+                                .map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
+                                .join(', ') || '---';
+                            
                             for (let i = 0; i < sorted.length; i += 2) {
-                                if (sorted[i].type === 'in' && sorted[i+1] && sorted[i+1].type === 'out') {
+                                if (sorted[i]?.type === 'in' && sorted[i+1]?.type === 'out') {
                                     workedMs += sorted[i+1].timestamp.toMillis() - sorted[i].timestamp.toMillis();
                                 }
                             }
                         }
-
-                        const justification = approvedRequests[dateString];
-                        let creditedMs = 0;
-                        let balanceMs = 0;
                         
-                        if (justification) {
-                            const hasSpecificAbono = justification.abonoMinutes && justification.abonoMinutes > 0;
+                        if (isJustified) {
+                            statusText = `Abonado (${justification.text})`;
+                            statusClass = 'text-blue-600 font-bold';
                             
-                            if (hasSpecificAbono) {
-                                creditedMs = justification.abonoMinutes * 60 * 1000;
+                            if (justification.abonoMinutes && justification.abonoMinutes > 0) {
+                                dailyBalanceMs = (workedMs + (justification.abonoMinutes * 60 * 1000)) - requiredWorkMs;
                             } else {
-                                creditedMs = Math.max(0, requiredWorkMs - workedMs);
+                                dailyBalanceMs = 0;
                             }
+                        }
+                        else if (!hasEntries) {
+                            statusText = 'Falta';
+                            statusClass = 'text-red-600 font-bold';
+                            dailyBalanceMs = -requiredWorkMs;
+                        }
+                        else if (hasEntries && dayEntries.length % 2 !== 0) {
+                            statusText = 'Batida Ímpar';
+                            statusClass = 'text-orange-500 font-bold';
+                            dailyBalanceMs = 0;
+                        }
+                        else {
+                            dailyBalanceMs = workedMs - requiredWorkMs;
                             
-                            balanceMs = (workedMs + creditedMs) - requiredWorkMs;
-
-                            const displayBalance = Math.abs(balanceMs) <= 59000 ? '00:00' : formatMilliseconds(balanceMs, true);
-                            dailyBalanceText = `${justification.text} (${displayBalance})`;
-                            dailyBalanceClass = 'text-blue-600';
-
-                        } else if (dayEntries.length === 0) { 
-                            dailyBalanceText = 'Falta';
-                            dailyBalanceClass = 'text-red-600 font-bold';
-                            balanceMs = -requiredWorkMs;
-                        } else { 
-                            balanceMs = workedMs - requiredWorkMs;
-                            const displayBalance = Math.abs(balanceMs) <= 15 * 60 * 1000 ? '00:00' : formatMilliseconds(balanceMs, true);
-                            dailyBalanceText = displayBalance;
-                            dailyBalanceClass = balanceMs >= 0 ? 'text-green-600' : 'text-red-600';
+                            if (Math.abs(dailyBalanceMs) <= toleranceMs) {
+                                statusText = '00:00';
+                                statusClass = 'text-green-600';
+                                dailyBalanceMs = 0;
+                            } else {
+                                statusText = formatMilliseconds(dailyBalanceMs, true);
+                                statusClass = dailyBalanceMs >= 0 ? 'text-green-600' : 'text-red-600';
+                            }
                         }
                         
-                        if (!isNaN(balanceMs)) {
-                                totalBalanceMs += balanceMs;
+                        if (!isJustified || dailyBalanceMs !== 0) {
+                            totalBalanceMs += dailyBalanceMs;
                         }
                     }
 
                     const row = document.createElement('tr');
-                    row.innerHTML = `<td class="px-6 py-4">${dateString}</td><td class="px-6 py-4 capitalize">${dayOfWeek.replace('.','')}</td><td class="px-6 py-4">${ins}</td><td class="px-6 py-4">${outs}</td><td class="px-6 py-4 font-medium ${dailyBalanceClass}">${dailyBalanceText}</td>`;
+                    row.innerHTML = `
+                        <td class="px-6 py-4">${dateString}</td>
+                        <td class="px-6 py-4 capitalize">${dayOfWeek.replace('.','')}</td>
+                        <td class="px-6 py-4">${ins}</td>
+                        <td class="px-6 py-4">${outs}</td>
+                        <td class="px-6 py-4 font-medium ${statusClass}">${statusText}</td>
+                    `;
                     ui.reportTableBody.appendChild(row);
 
                 } catch (errRow) {
                     console.error(`Erro ao renderizar linha para data ${currentDateItr}`, errRow);
                     const row = document.createElement('tr');
-                    row.innerHTML = `<td class="px-6 py-4 text-red-500">Erro na data</td><td colspan="4">Dados inválidos</td>`;
+                    row.innerHTML = `<td class="px-6 py-4 text-red-500" colspan="5">Erro ao processar data</td>`;
                     ui.reportTableBody.appendChild(row);
                 }
 
@@ -753,13 +772,14 @@
             }
 
             ui.monthlyBalance.textContent = `Saldo total do período: ${formatMilliseconds(totalBalanceMs, true)}`;
-            ui.monthlyBalance.className = `mt-4 p-4 rounded-md font-bold text-center ${totalBalanceMs >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
+            ui.monthlyBalance.className = `mt-4 p-4 rounded-md font-bold text-center ${
+                totalBalanceMs >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+            }`;
             ui.monthlyBalance.classList.remove('hidden');
             ui.downloadPdfBtn.classList.remove('hidden');
             ui.occurrenceSection.classList.remove('hidden');
         }
         
-        // Listener principal de mudança de funcionário para carregar dados
         ui.userDropdown.addEventListener('change', async (e) => {
             const selectedUserId = e.target.value;
             
@@ -824,7 +844,14 @@
             const userName = allUsers.find(u => u.id === userId)?.name;
             ui.reportTitle.textContent = `Histórico Editável para ${userName}`;
             ui.reportTableBody.innerHTML = '';
-            ui.reportTableHead.innerHTML = `<tr><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dia da Semana</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Entradas</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saídas</th><th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th></tr>`;
+            ui.reportTableHead.innerHTML = `<tr>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dia da Semana</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Entradas</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saídas</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
+            </tr>`;
             ui.noReportMessage.classList.add('hidden');
             
             const entriesByDay = allEntries.reduce((acc, entry) => {
@@ -857,40 +884,82 @@
                 const isWeekend = dayIndex === 0 || dayIndex === 6;
 
                 const dayEntries = entriesByDay[dateString] || [];
-                const ins = dayEntries.filter(e => e.type === 'in').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).sort().join(', ');
-                const outs = dayEntries.filter(e => e.type === 'out').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).sort().join(', ');
+                const ins = dayEntries.filter(e => e.type === 'in')
+                    .map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
+                    .sort().join(', ') || '---';
+                const outs = dayEntries.filter(e => e.type === 'out')
+                    .map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
+                    .sort().join(', ') || '---';
 
                 const row = document.createElement('tr');
                 
                 const requestForDay = userRequests.find(r => r.date === dateString);
-                let actionsHtml = '';
+                const isApproved = requestForDay?.status === 'approved';
+                
+                let statusText = '---';
+                let statusClass = 'text-gray-700';
+                
+                if (isWeekend) {
+                    statusText = 'Fim de Semana';
+                    statusClass = 'text-gray-500 italic';
+                } else if (isApproved) {
+                    statusText = `Abonado (${requestForDay.text})`;
+                    statusClass = 'text-blue-600 font-bold';
+                } else if (dayEntries.length === 0) {
+                    statusText = 'Falta';
+                    statusClass = 'text-red-600 font-bold';
+                } else if (dayEntries.length % 2 !== 0) {
+                    statusText = 'Batida Ímpar';
+                    statusClass = 'text-orange-500 font-bold';
+                } else {
+                    statusText = 'Normal';
+                    statusClass = 'text-green-600';
+                }
 
+                let actionsHtml = '';
                 if (isWeekend) {
                     actionsHtml = '---';
                 } else if (requestForDay) {
-                    const statusColors = { pending: 'text-yellow-500', approved: 'text-green-500', declined: 'text-red-500' };
+                    const statusColors = { 
+                        pending: 'text-yellow-500', 
+                        approved: 'text-green-500', 
+                        declined: 'text-red-500' 
+                    };
                     const iconColor = statusColors[requestForDay.status] || 'text-gray-500';
                     actionsHtml = `<div class="flex gap-2 items-center">
                         <button class="edit-day-btn text-blue-600 hover:text-blue-900" data-date="${currentDate.toISOString()}" data-user-id="${userId}">Editar</button>
                         <button class="view-request-btn ${iconColor} hover:opacity-75 text-xl" title="Analisar Solicitação" data-request-id="${requestForDay.id}">&#9993;</button>
                     </div>`;
                 } else {
-                    actionsHtml = `<div class="flex gap-2"><button class="edit-day-btn text-blue-600 hover:text-blue-900" data-date="${currentDate.toISOString()}" data-user-id="${userId}">Editar</button><button class="justify-day-btn text-green-600 hover:text-green-900" data-date="${currentDate.toISOString()}" data-user-id="${userId}">Justificar</button></div>`;
+                    actionsHtml = `<div class="flex gap-2">
+                        <button class="edit-day-btn text-blue-600 hover:text-blue-900" data-date="${currentDate.toISOString()}" data-user-id="${userId}">Editar</button>
+                        <button class="justify-day-btn text-green-600 hover:text-green-900" data-date="${currentDate.toISOString()}" data-user-id="${userId}">Justificar</button>
+                    </div>`;
                 }
 
-                row.innerHTML = `<td class="px-6 py-4">${dateString}</td><td class="px-6 py-4 capitalize">${dayOfWeek.replace('.','')}</td><td class="px-6 py-4">${ins || '---'}</td><td class="px-6 py-4">${outs || '---'}</td><td class="px-6 py-4">${actionsHtml}</td>`;
+                row.innerHTML = `
+                    <td class="px-6 py-4">${dateString}</td>
+                    <td class="px-6 py-4 capitalize">${dayOfWeek.replace('.','')}</td>
+                    <td class="px-6 py-4">${ins}</td>
+                    <td class="px-6 py-4">${outs}</td>
+                    <td class="px-6 py-4 font-medium ${statusClass}">${statusText}</td>
+                    <td class="px-6 py-4">${actionsHtml}</td>
+                `;
                 ui.reportTableBody.appendChild(row);
 
                 currentDate.setDate(currentDate.getDate() + 1);
             }
 
-            document.querySelectorAll('.edit-day-btn').forEach(button => button.addEventListener('click', (e) => showAddEntryModal(e.target.dataset.date, e.target.dataset.userId)));
-            document.querySelectorAll('.justify-day-btn').forEach(button => button.addEventListener('click', (e) => showJustifyModal(e.target.dataset.date, e.target.dataset.userId)));
-            document.querySelectorAll('.view-request-btn').forEach(button => button.addEventListener('click', (e) => {
-                const requestId = e.currentTarget.dataset.requestId;
-                const requestData = allRequests.find(r => r.id === requestId);
-                if (requestData) showRequestActionModal(requestData);
-            }));
+            document.querySelectorAll('.edit-day-btn').forEach(button => 
+                button.addEventListener('click', (e) => showAddEntryModal(e.target.dataset.date, e.target.dataset.userId)));
+            document.querySelectorAll('.justify-day-btn').forEach(button => 
+                button.addEventListener('click', (e) => showJustifyModal(e.target.dataset.date, e.target.dataset.userId)));
+            document.querySelectorAll('.view-request-btn').forEach(button => 
+                button.addEventListener('click', (e) => {
+                    const requestId = e.currentTarget.dataset.requestId;
+                    const requestData = allRequests.find(r => r.id === requestId);
+                    if (requestData) showRequestActionModal(requestData);
+                }));
         }
         
         async function showAddEntryModal(dateStr, userId) {
@@ -1089,7 +1158,6 @@
 
         ui.cancelEditBtn.addEventListener('click', () => { recordToEdit = null; ui.editModal.style.display = 'none'; });
 
-        // --- INÍCIO: NOVOS FILTROS DE SOLICITAÇÃO ---
         function populateRequestUserDropdown() {
             const statusFilter = ui.requestUserStatusFilter.value;
             ui.requestUserFilter.innerHTML = '<option value="">Todos os Funcionários</option>';
@@ -1111,10 +1179,8 @@
 
         function setupRequestFilters() {
             populateRequestUserDropdown();
-            // Default selected is "Todos", se quiser forçar pode definir aqui.
         }
 
-        // Lógica de Mês Rápido
         ui.requestMonthFilter.addEventListener('change', (e) => {
             const monthVal = e.target.value; 
             if (monthVal) {
@@ -1133,7 +1199,6 @@
             }
         });
 
-        // Event Listeners globais para os filtros de solicitação
         ui.requestUserStatusFilter.addEventListener('change', () => {
             populateRequestUserDropdown();
             filterAndRenderRequests();
@@ -1159,7 +1224,6 @@
 
             let filteredRequests = allRequests;
 
-            // Filtra primeiro pelo status selecionado (Ativo/Inativo)
             if (selectedStatus !== 'all') {
                 filteredRequests = filteredRequests.filter(req => {
                     const reqUser = allUsers.find(u => u.id === req.userId);
@@ -1168,14 +1232,12 @@
                 });
             }
 
-            // Depois filtra por usuário específico
             if (selectedUserId === 'none') {
                 filteredRequests = [];
             } else if (selectedUserId) {
                 filteredRequests = filteredRequests.filter(req => req.userId === selectedUserId);
             }
             
-            // Depois por data
             if (startDate) {
                 filteredRequests = filteredRequests.filter(req => {
                     const [day, month, year] = req.date.split('/');
@@ -1191,7 +1253,6 @@
                 });
             }
             
-            // E finalmente pelo texto de busca
             if (searchText) {
                 filteredRequests = filteredRequests.filter(req => req.text.toLowerCase().includes(searchText));
             }
@@ -1206,7 +1267,6 @@
             
             renderRequestsTable(filteredRequests);
         }
-        // --- FIM: NOVOS FILTROS DE SOLICITAÇÃO ---
 
         function renderRequestsTable(requests) {
             ui.requestTableBody.innerHTML = '';
@@ -1276,7 +1336,6 @@
                 ui.occurrenceStatus.className = 'text-sm text-red-500 mr-4';
                 return;
             }
-            // Usa o mês/ano da DATA INICIAL para salvar
             const [year, month] = startDateVal.split('-');
             const reportId = `${year}-${month}`;
             const reportDocRef = doc(db, 'artifacts', appId, 'users', selectedUserId, 'reports', reportId);
@@ -1300,14 +1359,13 @@
             const selectedUserId = ui.userDropdown.value;
             const userName = allUsers.find(u => u.id === selectedUserId)?.name || 'Usuário';
             
-            // Formatando período para o título
             const startDate = new Date(ui.reportStartDate.value + 'T00:00:00');
             const endDate = new Date(ui.reportEndDate.value + 'T00:00:00');
             const periodStr = `${startDate.toLocaleDateString('pt-BR')} a ${endDate.toLocaleDateString('pt-BR')}`;
 
             doc.setFontSize(18); doc.text(`Relatório de Ponto - ${userName}`, 14, 22);
             doc.setFontSize(12); doc.text(`Período: ${periodStr}`, 14, 30);
-            const head = [['Data', 'Dia da Semana', 'Entradas', 'Saídas', 'Saldo do Dia']];
+            const head = [['Data', 'Dia da Semana', 'Entradas', 'Saídas', 'Status/Saldo']];
             const body = Array.from(ui.reportTableBody.querySelectorAll('tr')).map(row => Array.from(row.querySelectorAll('td')).map(cell => cell.innerText));
             doc.autoTable({ head, body, startY: 40, theme: 'striped', headStyles: { fillColor: [22, 160, 133] } });
             let finalY = doc.lastAutoTable.finalY;
@@ -1316,12 +1374,10 @@
             const q = query(requestsRef, where("userId", "==", selectedUserId), where("status", "==", "approved"));
             const requestsSnapshot = await getDocs(q);
             
-            // Filtrar requests pelo período
             const rangeRequests = requestsSnapshot.docs.map(d => d.data()).filter(req => {
                 if (!req.date) return false;
                 const [d, m, y] = req.date.split('/');
                 const rDate = new Date(y, m-1, d);
-                // Ajustar horas para comparação justa
                 rDate.setHours(0,0,0,0);
                 const start = new Date(startDate); start.setHours(0,0,0,0);
                 const end = new Date(endDate); end.setHours(0,0,0,0);
@@ -1453,7 +1509,7 @@
 
                     if (isJustified) {
                         const req = approvedRequests.find(r => r.date === dateString);
-                        dailyBalanceText = req ? req.text : 'Justificado';
+                        dailyBalanceText = req ? `Abonado (${req.text})` : 'Abonado';
                     } else if (!dayEntries) {
                         totalBalanceMs -= (6 * 3600 * 1000);
                         absenceDays++;
@@ -1468,7 +1524,7 @@
                         }
                         totalWorkedMs += dailyWorkedMs;
                         const dailyBalanceMs = dailyWorkedMs - (6 * 3600 * 1000);
-                        const toleranceMs = (15 * 60 * 1000) + (59 * 1000); // 15 min + 59 seg
+                        const toleranceMs = (15 * 60 * 1000) + (59 * 1000);
                         
                         if (Math.abs(dailyBalanceMs) > toleranceMs) {
                             totalBalanceMs += dailyBalanceMs;
@@ -1551,7 +1607,7 @@
             doc.setFontSize(12); doc.setFont('helvetica', 'bold');
             doc.text('Registros de Ponto Detalhados', 14, finalY);
             
-            const head = [['Data', 'Dia', 'Entradas', 'Saídas', 'Saldo']];
+            const head = [['Data', 'Dia', 'Entradas', 'Saídas', 'Status']];
             doc.autoTable({ 
                 head, 
                 body: reportData.detailedBody, 
@@ -1621,7 +1677,6 @@
         ui.userStatusFilter.addEventListener('change', filterAndRenderUsersManagementTable);
         ui.applyQuickEntryBtn.addEventListener('click', applyQuickEntry);
 
-        // *** INÍCIO: LÓGICA DAS ABAS ***
         const tabs = [ui.tabReports, ui.tabRequests, ui.tabUsers];
         const panels = [ui.panelReports, ui.panelRequests, ui.panelUsers];
 
@@ -1641,7 +1696,6 @@
         ui.tabRequests.addEventListener('click', () => switchTab(ui.tabRequests, ui.panelRequests));
         ui.tabUsers.addEventListener('click', () => switchTab(ui.tabUsers, ui.panelUsers));
         
-        // Notificação
         ui.notificationIcon.addEventListener('click', (e) => {
             e.stopPropagation(); 
             ui.notificationPopover.classList.toggle('hidden');
@@ -1723,7 +1777,6 @@
 
         document.getElementById('header-date').textContent = new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
         
-        // Define data inicial para o primeiro dia do mês atual e final para hoje, como padrão
         const now = new Date();
         const firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
         ui.reportStartDate.value = firstDay.toISOString().split('T')[0];
