@@ -154,7 +154,7 @@
                                         <button id="save-occurrence-btn" class="py-1 px-3 rounded-md text-sm text-white bg-indigo-600 hover:bg-indigo-700">Salvar Ocorrência</button>
                                     </div>
                                 </div>
-                                <p id="no-report-message" class="text-center py-4 text-gray-500">Selecione um funcionário para ver o relatório.</p>
+                                <p id="no-report-message" class="text-center py-4 text-gray-500">Selecione um funcionário e clique em "Gerar Relatório".</p>
                             </div>
                         </div>
                     </div>
@@ -416,7 +416,7 @@
             notificationList: document.getElementById('requests-notification-list'),
         };
 
-        let unsubscribe = { users: null, requests: null, entries: null };
+        let unsubscribe = { users: null, requests: null };
         let allUsers = [];
         let allRequests = [];
         let filteredEmployees = [];
@@ -452,7 +452,6 @@
                 ui.appScreen.classList.add('hidden');
                 if (unsubscribe.users) unsubscribe.users();
                 if (unsubscribe.requests) unsubscribe.requests();
-                if (unsubscribe.entries) unsubscribe.entries();
             }
         });
 
@@ -542,244 +541,20 @@
             });
         }
         
-        ui.generateReportBtn.addEventListener('click', async () => {
-            const selectedUserId = ui.userDropdown.value;
-            const startDateVal = ui.reportStartDate.value;
-            const endDateVal = ui.reportEndDate.value;
-
-            if (unsubscribe.entries) {
-                unsubscribe.entries();
-                unsubscribe.entries = null;
-            }
-
-            if (selectedUserId && startDateVal && endDateVal) {
-                if(startDateVal > endDateVal) {
-                    alert('A data final deve ser posterior à data inicial.');
-                    return;
-                }
-                const startDate = new Date(startDateVal + 'T00:00:00');
-                const endDate = new Date(endDateVal + 'T23:59:59');
-                await generateAndRenderReport(selectedUserId, startDate, endDate);
-            } else {
-                ui.reportTitle.textContent = 'Histórico de Registros';
-                ui.reportTableBody.innerHTML = '';
-                ui.reportTableHead.innerHTML = '';
-                ui.monthlyBalance.classList.add('hidden');
-                ui.downloadPdfBtn.classList.add('hidden');
-                ui.occurrenceSection.classList.add('hidden');
-                ui.occurrenceDetails.value = '';
-                ui.occurrenceStatus.textContent = '';
-                ui.noReportMessage.classList.remove('hidden');
-                ui.noReportMessage.textContent = "Por favor, selecione um funcionário e o intervalo de datas.";
-            }
-        });
-
-        async function generateAndRenderReport(userId, startDate, endDate) {
-            ui.reportTitle.textContent = `Carregando dados...`;
+        // --- FUNÇÕES DE LIMPEZA E CONTROLE MANUAL DA TABELA DE RELATÓRIO ---
+        function clearAdminReportArea() {
+            ui.reportTitle.textContent = 'Histórico de Registros';
             ui.reportTableBody.innerHTML = '';
+            ui.reportTableHead.innerHTML = '';
             ui.monthlyBalance.classList.add('hidden');
             ui.downloadPdfBtn.classList.add('hidden');
-            ui.noReportMessage.classList.add('hidden');
-
-            const entriesRef = collection(db, 'artifacts', appId, 'users', userId, 'time_entries');
-            
-            try {
-                const entriesQuery = query(entriesRef, 
-                    where("timestamp", ">=", Timestamp.fromDate(startDate)),
-                    where("timestamp", "<=", Timestamp.fromDate(endDate)),
-                    orderBy("timestamp", "asc")
-                );
-                const entriesSnapshot = await getDocs(entriesQuery);
-                const filteredEntries = entriesSnapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-                await renderReportTable(filteredEntries, userId, startDate, endDate);
-            } catch(e) {
-                console.log("Índice não encontrado ou erro na query composta. Usando fallback de ordenação simples.", e);
-                try {
-                    const qAll = query(entriesRef, orderBy("timestamp", "asc"));
-                    const snapAll = await getDocs(qAll);
-                    const all = snapAll.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-                    
-                    const filtered = all.filter(e => {
-                        if (!e.timestamp) return false;
-                        const d = e.timestamp.toDate();
-                        return d >= startDate && d <= endDate;
-                    });
-                    await renderReportTable(filtered, userId, startDate, endDate);
-                } catch (err2) {
-                     console.error("Erro fatal ao buscar dados:", err2);
-                     ui.reportTitle.textContent = `Erro ao carregar dados.`;
-                }
-            }
+            ui.occurrenceSection.classList.add('hidden');
+            ui.occurrenceDetails.value = '';
+            ui.occurrenceStatus.textContent = '';
+            ui.noReportMessage.classList.remove('hidden');
+            ui.noReportMessage.textContent = "Clique em 'Gerar Relatório' para visualizar e editar os registros.";
         }
 
-        async function renderReportTable(entries, userId, startDate, endDate) {
-            const userName = allUsers.find(u => u.id === userId)?.name;
-            const startStr = startDate.toLocaleDateString('pt-BR');
-            const endStr = endDate.toLocaleDateString('pt-BR');
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            
-            ui.reportTitle.textContent = `Relatório para ${userName} (${startStr} a ${endStr})`;
-            ui.reportTableBody.innerHTML = '';
-            ui.reportTableHead.innerHTML = `<tr>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dia da Semana</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Entradas</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saídas</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status / Saldo</th>
-            </tr>`;
-            ui.noReportMessage.classList.add('hidden');
-            
-            const requestsRef = collection(db, `/artifacts/${appId}/requests`);
-            const q = query(requestsRef, where("userId", "==", userId), where("status", "==", "approved"));
-            let approvedRequests = {};
-            try {
-                const requestsSnapshot = await getDocs(q);
-                requestsSnapshot.docs.forEach(doc => {
-                    const req = doc.data();
-                    if (req.date) {
-                        approvedRequests[req.date] = req; 
-                    }
-                });
-            } catch(e) {
-                console.error("Erro ao buscar justificativas", e);
-            }
-
-            const entriesByDay = entries.reduce((acc, entry) => {
-                try {
-                    if (entry.timestamp) {
-                        const date = entry.timestamp.toDate().toLocaleDateString('pt-BR');
-                        if (!acc[date]) acc[date] = [];
-                        acc[date].push(entry);
-                    }
-                } catch(e) { console.error("Erro ao processar entrada:", entry); }
-                return acc;
-            }, {});
-
-            let totalBalanceMs = 0;
-            const requiredWorkMs = 6 * 3600 * 1000;
-            const toleranceMs = (15 * 60 * 1000) + (59 * 1000);
-
-            let currentDateItr = new Date(startDate);
-            currentDateItr.setHours(0, 0, 0, 0);
-            
-            const loopEndItr = new Date(endDate);
-            loopEndItr.setHours(23, 59, 59, 999);
-
-            let safetyCounter = 0;
-            while(currentDateItr <= loopEndItr && safetyCounter < 370) { 
-                safetyCounter++;
-                
-                try {
-                    const dateString = currentDateItr.toLocaleDateString('pt-BR');
-                    const dayOfWeek = currentDateItr.toLocaleDateString('pt-BR', { weekday: 'short' });
-                    const dayIndex = currentDateItr.getDay();
-                    const isWeekend = dayIndex === 0 || dayIndex === 6;
-                    const isFutureDay = currentDateItr > today;
-                    
-                    const dayEntries = entriesByDay[dateString] || [];
-                    const hasEntries = dayEntries.length > 0;
-                    
-                    const justification = approvedRequests[dateString];
-                    const isJustified = !!justification;
-                    
-                    let ins = '---';
-                    let outs = '---';
-                    let statusText = '---';
-                    let statusClass = 'text-gray-700';
-                    let dailyBalanceMs = 0;
-                    
-                    if (isWeekend) {
-                        statusText = 'Fim de Semana';
-                        statusClass = 'text-gray-500 italic';
-                    } else if (isFutureDay) {
-                        statusText = '---';
-                        statusClass = 'text-gray-700';
-                    } else {
-                        let workedMs = 0;
-                        if (hasEntries) {
-                            const sorted = [...dayEntries].sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
-                            ins = sorted.filter(e => e.type === 'in')
-                                .map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
-                                .join(', ') || '---';
-                            outs = sorted.filter(e => e.type === 'out')
-                                .map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
-                                .join(', ') || '---';
-                            
-                            for (let i = 0; i < sorted.length; i += 2) {
-                                if (sorted[i]?.type === 'in' && sorted[i+1]?.type === 'out') {
-                                    workedMs += sorted[i+1].timestamp.toMillis() - sorted[i].timestamp.toMillis();
-                                }
-                            }
-                        }
-                        
-                        if (isJustified) {
-                            statusText = `Abonado (${justification.text})`;
-                            statusClass = 'text-blue-600 font-bold';
-                            
-                            if (justification.abonoMinutes && justification.abonoMinutes > 0) {
-                                dailyBalanceMs = (workedMs + (justification.abonoMinutes * 60 * 1000)) - requiredWorkMs;
-                            } else {
-                                dailyBalanceMs = 0;
-                            }
-                        }
-                        else if (!hasEntries) {
-                            statusText = 'Falta';
-                            statusClass = 'text-red-600 font-bold';
-                            dailyBalanceMs = -requiredWorkMs;
-                        }
-                        else if (hasEntries && dayEntries.length % 2 !== 0) {
-                            statusText = 'Batida Ímpar';
-                            statusClass = 'text-orange-500 font-bold';
-                            dailyBalanceMs = 0;
-                        }
-                        else {
-                            dailyBalanceMs = workedMs - requiredWorkMs;
-                            
-                            if (Math.abs(dailyBalanceMs) <= toleranceMs) {
-                                statusText = '00:00';
-                                statusClass = 'text-green-600';
-                                dailyBalanceMs = 0;
-                            } else {
-                                statusText = formatMilliseconds(dailyBalanceMs, true);
-                                statusClass = dailyBalanceMs >= 0 ? 'text-green-600' : 'text-red-600';
-                            }
-                        }
-                        
-                        if (!isJustified || dailyBalanceMs !== 0) {
-                            totalBalanceMs += dailyBalanceMs;
-                        }
-                    }
-
-                    const row = document.createElement('tr');
-                    row.innerHTML = `
-                        <td class="px-6 py-4">${dateString}</td>
-                        <td class="px-6 py-4 capitalize">${dayOfWeek.replace('.','')}</td>
-                        <td class="px-6 py-4">${ins}</td>
-                        <td class="px-6 py-4">${outs}</td>
-                        <td class="px-6 py-4 font-medium ${statusClass}">${statusText}</td>
-                    `;
-                    ui.reportTableBody.appendChild(row);
-
-                } catch (errRow) {
-                    console.error(`Erro ao renderizar linha para data ${currentDateItr}`, errRow);
-                    const row = document.createElement('tr');
-                    row.innerHTML = `<td class="px-6 py-4 text-red-500" colspan="5">Erro ao processar data</td>`;
-                    ui.reportTableBody.appendChild(row);
-                }
-
-                currentDateItr.setDate(currentDateItr.getDate() + 1);
-            }
-
-            ui.monthlyBalance.textContent = `Saldo total do período: ${formatMilliseconds(totalBalanceMs, true)}`;
-            ui.monthlyBalance.className = `mt-4 p-4 rounded-md font-bold text-center ${
-                totalBalanceMs >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
-            }`;
-            ui.monthlyBalance.classList.remove('hidden');
-            ui.downloadPdfBtn.classList.remove('hidden');
-            ui.occurrenceSection.classList.remove('hidden');
-        }
-        
         ui.userDropdown.addEventListener('change', async (e) => {
             const selectedUserId = e.target.value;
             
@@ -788,72 +563,88 @@
                 filterAndRenderRequests(); 
             }
 
-            ui.monthlyBalance.classList.add('hidden');
-            ui.downloadPdfBtn.classList.add('hidden');
+            clearAdminReportArea();
             
-            if (selectedUserId) {
-                ui.reportTitle.textContent = `Carregando histórico...`;
-                ui.noReportMessage.classList.add('hidden');
-                
-                const startDateVal = ui.reportStartDate.value;
-                if(startDateVal) {
-                     const [y, m, d] = startDateVal.split('-');
-                     await loadOccurrence(selectedUserId, parseInt(m, 10), parseInt(y, 10));
-                     ui.occurrenceSection.classList.remove('hidden');
-                }
-
-                const entriesRef = collection(db, 'artifacts', appId, 'users', selectedUserId, 'time_entries');
-                const entriesQuery = query(entriesRef, orderBy("timestamp", "asc"));
-                
-                if (unsubscribe.entries) unsubscribe.entries();
-                unsubscribe.entries = onSnapshot(entriesQuery, (snapshot) => {
-                    const allEntries = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-                    renderEditableDailyHistory(allEntries, selectedUserId);
-                });
-            } else {
-                ui.reportTableBody.innerHTML = '';
-                ui.reportTableHead.innerHTML = '';
-                ui.reportTitle.textContent = 'Histórico de Registros';
-                ui.occurrenceSection.classList.add('hidden');
-                ui.occurrenceDetails.value = '';
-                ui.occurrenceStatus.textContent = '';
-                ui.noReportMessage.classList.remove('hidden');
-                ui.noReportMessage.textContent = "Selecione um funcionário.";
+            if (selectedUserId && ui.reportStartDate.value) {
+                 const [y, m, d] = ui.reportStartDate.value.split('-');
+                 await loadOccurrence(selectedUserId, parseInt(m, 10), parseInt(y, 10));
+                 ui.occurrenceSection.classList.remove('hidden');
+            } else if (!selectedUserId) {
+                 ui.noReportMessage.textContent = "Selecione um funcionário.";
             }
         });
-        
+
         [ui.reportStartDate, ui.reportEndDate].forEach(el => {
-            el.addEventListener('change', async () => {
-                const selectedUserId = ui.userDropdown.value;
-                if(selectedUserId && ui.reportStartDate.value) {
-                     const [y, m, d] = ui.reportStartDate.value.split('-');
-                     await loadOccurrence(selectedUserId, parseInt(m, 10), parseInt(y, 10));
-                }
-            });
+            el.addEventListener('change', clearAdminReportArea);
         });
 
-        async function renderEditableDailyHistory(allEntries, userId) {
-            if (!unsubscribe.entries) return;
-
+        ui.generateReportBtn.addEventListener('click', async () => {
+            const selectedUserId = ui.userDropdown.value;
             const startDateVal = ui.reportStartDate.value;
             const endDateVal = ui.reportEndDate.value;
-            
-            if(!startDateVal || !endDateVal) return;
-            if(startDateVal > endDateVal) return;
+
+            if (selectedUserId && startDateVal && endDateVal) {
+                if(startDateVal > endDateVal) {
+                    alert('A data final deve ser posterior à data inicial.');
+                    return;
+                }
+                const startDate = new Date(startDateVal + 'T00:00:00');
+                const endDate = new Date(endDateVal + 'T23:59:59');
+                await loadAndRenderEditableHistory(selectedUserId, startDate, endDate);
+            } else {
+                clearAdminReportArea();
+                ui.noReportMessage.textContent = "Por favor, selecione um funcionário e o intervalo de datas antes de gerar.";
+            }
+        });
+
+        // --- FUNÇÃO UNIFICADA: GERA A TABELA EDITÁVEL E CALCULA O SALDO ---
+        async function loadAndRenderEditableHistory(userId, startDate, endDate) {
+            ui.reportTitle.textContent = `Carregando dados...`;
+            ui.reportTableBody.innerHTML = '';
+            ui.monthlyBalance.classList.add('hidden');
+            ui.downloadPdfBtn.classList.add('hidden');
+            ui.noReportMessage.classList.add('hidden');
 
             const userName = allUsers.find(u => u.id === userId)?.name;
-            ui.reportTitle.textContent = `Histórico Editável para ${userName}`;
-            ui.reportTableBody.innerHTML = '';
+            const startStr = startDate.toLocaleDateString('pt-BR');
+            const endStr = endDate.toLocaleDateString('pt-BR');
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+
             ui.reportTableHead.innerHTML = `<tr>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Data</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Dia da Semana</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Entradas</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Saídas</th>
-                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status / Saldo</th>
                 <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ações</th>
             </tr>`;
-            ui.noReportMessage.classList.add('hidden');
+
+            const entriesRef = collection(db, 'artifacts', appId, 'users', userId, 'time_entries');
+            let allEntries = [];
             
+            try {
+                const q = query(entriesRef, 
+                    where("timestamp", ">=", Timestamp.fromDate(startDate)),
+                    where("timestamp", "<=", Timestamp.fromDate(endDate)),
+                    orderBy("timestamp", "asc")
+                );
+                const snap = await getDocs(q);
+                allEntries = snap.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+            } catch(e) {
+                console.log("Fallback query due to missing index.", e);
+                const qAll = query(entriesRef, orderBy("timestamp", "asc"));
+                const snapAll = await getDocs(qAll);
+                const all = snapAll.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+                allEntries = all.filter(e => {
+                    if (!e.timestamp) return false;
+                    const d = e.timestamp.toDate();
+                    return d >= startDate && d <= endDate;
+                });
+            }
+
+            ui.reportTitle.textContent = `Relatório para ${userName} (${startStr} a ${endStr})`;
+
             const entriesByDay = allEntries.reduce((acc, entry) => {
                 if (entry.timestamp) {
                     const date = entry.timestamp.toDate().toLocaleDateString('pt-BR');
@@ -862,73 +653,104 @@
                 }
                 return acc;
             }, {});
-            
-            const userRequests = allRequests.filter(r => r.userId === userId);
 
-            let currentDate = new Date(startDateVal + 'T00:00:00');
-            const loopEnd = new Date(endDateVal + 'T23:59:59');
-            const today = new Date();
-            today.setHours(0,0,0,0);
+            // Solicitações do usuário
+            const requestsRef = collection(db, `/artifacts/${appId}/requests`);
+            const allUserReqQ = query(requestsRef, where("userId", "==", userId));
+            let allUserRequests = [];
+            try {
+                const allReqSnap = await getDocs(allUserReqQ);
+                allUserRequests = allReqSnap.docs.map(d => ({ ...d.data(), id: d.id }));
+            } catch(e) { console.error(e); }
+
+            let totalBalanceMs = 0;
+            const requiredWorkMs = 6 * 3600 * 1000;
+            const toleranceMs = (15 * 60 * 1000) + (59 * 1000);
+
+            let currentDate = new Date(startDate);
+            currentDate.setHours(0, 0, 0, 0);
+            const loopEnd = new Date(endDate);
+            loopEnd.setHours(23, 59, 59, 999);
 
             let safety = 0;
             while(currentDate <= loopEnd && safety < 370) {
                 safety++;
-                if (currentDate > today) {
-                     currentDate.setDate(currentDate.getDate() + 1);
-                     continue; 
-                }
-
                 const dateString = currentDate.toLocaleDateString('pt-BR');
-                const dayOfWeek = currentDate.toLocaleDateString('pt-BR', { weekday: 'short' });
+                const dayOfWeek = currentDate.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
                 const dayIndex = currentDate.getDay();
                 const isWeekend = dayIndex === 0 || dayIndex === 6;
+                const isFutureDay = currentDate > today;
 
                 const dayEntries = entriesByDay[dateString] || [];
-                const ins = dayEntries.filter(e => e.type === 'in')
-                    .map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
-                    .sort().join(', ') || '---';
-                const outs = dayEntries.filter(e => e.type === 'out')
-                    .map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }))
-                    .sort().join(', ') || '---';
+                const hasEntries = dayEntries.length > 0;
+                
+                const anyRequestForDay = allUserRequests.find(r => r.date === dateString);
+                const isApproved = anyRequestForDay?.status === 'approved';
 
-                const row = document.createElement('tr');
-                
-                const requestForDay = userRequests.find(r => r.date === dateString);
-                const isApproved = requestForDay?.status === 'approved';
-                
-                let statusText = '---';
-                let statusClass = 'text-gray-700';
-                
+                let ins = '---', outs = '---', statusText = '---', statusClass = 'text-gray-700';
+                let dailyBalanceMs = 0;
+
                 if (isWeekend) {
                     statusText = 'Fim de Semana';
                     statusClass = 'text-gray-500 italic';
-                } else if (isApproved) {
-                    statusText = `Abonado (${requestForDay.text})`;
-                    statusClass = 'text-blue-600 font-bold';
-                } else if (dayEntries.length === 0) {
-                    statusText = 'Falta';
-                    statusClass = 'text-red-600 font-bold';
-                } else if (dayEntries.length % 2 !== 0) {
-                    statusText = 'Batida Ímpar';
-                    statusClass = 'text-orange-500 font-bold';
+                } else if (isFutureDay) {
+                    statusText = '---';
+                    statusClass = 'text-gray-700';
                 } else {
-                    statusText = 'Normal';
-                    statusClass = 'text-green-600';
+                    let workedMs = 0;
+                    if (hasEntries) {
+                        const sorted = [...dayEntries].sort((a,b) => a.timestamp.toMillis() - b.timestamp.toMillis());
+                        ins = sorted.filter(e => e.type === 'in').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).join(', ') || '---';
+                        outs = sorted.filter(e => e.type === 'out').map(e => e.timestamp.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })).join(', ') || '---';
+                        for (let i = 0; i < sorted.length; i += 2) {
+                            if (sorted[i]?.type === 'in' && sorted[i+1]?.type === 'out') {
+                                workedMs += sorted[i+1].timestamp.toMillis() - sorted[i].timestamp.toMillis();
+                            }
+                        }
+                    }
+
+                    if (isApproved) {
+                        statusText = `Abonado (${anyRequestForDay.text})`;
+                        statusClass = 'text-blue-600 font-bold';
+                        if (anyRequestForDay.abonoMinutes && anyRequestForDay.abonoMinutes > 0) {
+                            dailyBalanceMs = (workedMs + (anyRequestForDay.abonoMinutes * 60 * 1000)) - requiredWorkMs;
+                        } else {
+                            dailyBalanceMs = 0;
+                        }
+                    } else if (!hasEntries) {
+                        statusText = 'Falta';
+                        statusClass = 'text-red-600 font-bold';
+                        dailyBalanceMs = -requiredWorkMs;
+                    } else if (hasEntries && dayEntries.length % 2 !== 0) {
+                        statusText = 'Batida Ímpar';
+                        statusClass = 'text-orange-500 font-bold';
+                        dailyBalanceMs = 0;
+                    } else {
+                        dailyBalanceMs = workedMs - requiredWorkMs;
+                        if (Math.abs(dailyBalanceMs) <= toleranceMs) {
+                            statusText = '00:00';
+                            statusClass = 'text-green-600';
+                            dailyBalanceMs = 0;
+                        } else {
+                            statusText = formatMilliseconds(dailyBalanceMs, true);
+                            statusClass = dailyBalanceMs >= 0 ? 'text-green-600' : 'text-red-600';
+                        }
+                    }
+
+                    if (!isApproved || dailyBalanceMs !== 0) {
+                        totalBalanceMs += dailyBalanceMs;
+                    }
                 }
 
                 let actionsHtml = '';
-                if (isWeekend) {
+                if (isWeekend || isFutureDay) {
                     actionsHtml = '---';
-                } else if (requestForDay) {
-                    const statusColors = { 
-                        pending: 'text-yellow-500', 
-                        approved: 'text-green-500', 
-                        declined: 'text-red-500' 
-                    };
-                    const iconColor = statusColors[requestForDay.status] || 'text-gray-500';
+                } else if (anyRequestForDay) {
+                    const statusColors = { pending: 'text-yellow-500', approved: 'text-green-500', declined: 'text-red-500' };
+                    const iconColor = statusColors[anyRequestForDay.status] || 'text-gray-500';
                     actionsHtml = `<div class="flex gap-2 items-center">
                         <button class="edit-day-btn text-blue-600 hover:text-blue-900" data-date="${currentDate.toISOString()}" data-user-id="${userId}">Editar</button>
-                        <button class="view-request-btn ${iconColor} hover:opacity-75 text-xl" title="Analisar Solicitação" data-request-id="${requestForDay.id}">&#9993;</button>
+                        <button class="view-request-btn ${iconColor} hover:opacity-75 text-xl" title="Analisar Solicitação" data-request-id="${anyRequestForDay.id}">&#9993;</button>
                     </div>`;
                 } else {
                     actionsHtml = `<div class="flex gap-2">
@@ -937,9 +759,10 @@
                     </div>`;
                 }
 
+                const row = document.createElement('tr');
                 row.innerHTML = `
                     <td class="px-6 py-4">${dateString}</td>
-                    <td class="px-6 py-4 capitalize">${dayOfWeek.replace('.','')}</td>
+                    <td class="px-6 py-4 capitalize">${dayOfWeek}</td>
                     <td class="px-6 py-4">${ins}</td>
                     <td class="px-6 py-4">${outs}</td>
                     <td class="px-6 py-4 font-medium ${statusClass}">${statusText}</td>
@@ -950,16 +773,18 @@
                 currentDate.setDate(currentDate.getDate() + 1);
             }
 
-            document.querySelectorAll('.edit-day-btn').forEach(button => 
-                button.addEventListener('click', (e) => showAddEntryModal(e.target.dataset.date, e.target.dataset.userId)));
-            document.querySelectorAll('.justify-day-btn').forEach(button => 
-                button.addEventListener('click', (e) => showJustifyModal(e.target.dataset.date, e.target.dataset.userId)));
-            document.querySelectorAll('.view-request-btn').forEach(button => 
-                button.addEventListener('click', (e) => {
-                    const requestId = e.currentTarget.dataset.requestId;
-                    const requestData = allRequests.find(r => r.id === requestId);
-                    if (requestData) showRequestActionModal(requestData);
-                }));
+            ui.monthlyBalance.textContent = `Saldo total do período: ${formatMilliseconds(totalBalanceMs, true)}`;
+            ui.monthlyBalance.className = `mt-4 p-4 rounded-md font-bold text-center ${totalBalanceMs >= 0 ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`;
+            ui.monthlyBalance.classList.remove('hidden');
+            ui.downloadPdfBtn.classList.remove('hidden');
+            ui.occurrenceSection.classList.remove('hidden');
+
+            document.querySelectorAll('.edit-day-btn').forEach(btn => btn.addEventListener('click', (e) => showAddEntryModal(e.target.dataset.date, e.target.dataset.userId)));
+            document.querySelectorAll('.justify-day-btn').forEach(btn => btn.addEventListener('click', (e) => showJustifyModal(e.target.dataset.date, e.target.dataset.userId)));
+            document.querySelectorAll('.view-request-btn').forEach(btn => btn.addEventListener('click', (e) => {
+                const reqData = allUserRequests.find(r => r.id === e.currentTarget.dataset.requestId);
+                if (reqData) showRequestActionModal(reqData);
+            }));
         }
         
         async function showAddEntryModal(dateStr, userId) {
@@ -1046,6 +871,7 @@
             msgEl.className = 'text-sm mt-4 text-center text-gray-600';
             ui.saveJustifyBtn.disabled = true; ui.cancelJustifyBtn.disabled = true;
             const user = allUsers.find(u => u.id === userId);
+            
             if (!user) {
                 msgEl.textContent = 'Usuário não encontrado.';
                 msgEl.className = 'text-sm mt-4 text-center text-red-600';
@@ -1070,7 +896,6 @@
                 setTimeout(() => {
                     ui.justifyModal.style.display = 'none'; dayToJustify = null; msgEl.textContent = '';
                     ui.saveJustifyBtn.disabled = false; ui.cancelJustifyBtn.disabled = false;
-                    ui.generateReportBtn.click();
                 }, 1500);
             } catch (error) {
                 console.error("Erro ao salvar justificativa:", error);
@@ -1145,18 +970,6 @@
             document.getElementById('confirm-delete-btn').textContent = 'Apagar';
             document.getElementById('confirm-delete-btn').className = 'py-2 px-4 rounded-md text-white bg-red-600 hover:bg-red-700';
         });
-
-        ui.saveEditBtn.addEventListener('click', async () => {
-            if (recordToEdit) {
-                const { userId, recordId, date } = recordToEdit;
-                const [newHours, newMinutes] = ui.editTimeInput.value.split(':').map(Number);
-                const newDate = new Date(date); newDate.setHours(newHours, newMinutes, 0);
-                try { await updateDoc(doc(db, `artifacts/${appId}/users/${userId}/time_entries`, recordId), { timestamp: Timestamp.fromDate(newDate) }); } catch (error) { console.error("Erro ao editar registro:", error); } 
-                finally { recordToEdit = null; ui.editModal.style.display = 'none'; }
-            }
-        });
-
-        ui.cancelEditBtn.addEventListener('click', () => { recordToEdit = null; ui.editModal.style.display = 'none'; });
 
         function populateRequestUserDropdown() {
             const statusFilter = ui.requestUserStatusFilter.value;
@@ -1305,7 +1118,6 @@
                 dataToUpdate.abonoMinutes = null;
             }
             await updateDoc(doc(db, `/artifacts/${appId}/requests`, requestId), dataToUpdate);
-            ui.generateReportBtn.click();
         }
 
         function formatMilliseconds(ms, showSign = false) {
@@ -1365,8 +1177,14 @@
 
             doc.setFontSize(18); doc.text(`Relatório de Ponto - ${userName}`, 14, 22);
             doc.setFontSize(12); doc.text(`Período: ${periodStr}`, 14, 30);
+            
+            // EXCLUI A COLUNA "Ações" (Mapeia apenas os índices de 0 a 4)
             const head = [['Data', 'Dia da Semana', 'Entradas', 'Saídas', 'Status/Saldo']];
-            const body = Array.from(ui.reportTableBody.querySelectorAll('tr')).map(row => Array.from(row.querySelectorAll('td')).map(cell => cell.innerText));
+            const body = Array.from(ui.reportTableBody.querySelectorAll('tr')).map(row => {
+                const cells = Array.from(row.querySelectorAll('td')).map(cell => cell.innerText);
+                return cells.slice(0, 5); // Pega apenas as 5 primeiras colunas, cortando as Ações
+            });
+
             doc.autoTable({ head, body, startY: 40, theme: 'striped', headStyles: { fillColor: [22, 160, 133] } });
             let finalY = doc.lastAutoTable.finalY;
             
@@ -1764,7 +1582,6 @@
                 await batch.commit();
                 statusEl.textContent = 'Período aplicado com sucesso!';
                 statusEl.className = 'text-sm mt-4 text-center text-green-600';
-                ui.generateReportBtn.click(); 
             } catch (error) {
                 console.error("Erro ao aplicar período:", error);
                 statusEl.textContent = 'Erro ao salvar. Tente novamente.';
