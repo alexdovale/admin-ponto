@@ -153,6 +153,7 @@ label:has(input[name="access_type"]:checked) { border-color: #10B981; background
         <nav class="-mb-px flex space-x-8 overflow-x-auto">
           <button id="tab-reports" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-green-500 text-green-600">Relatórios de Ponto</button>
           <button id="tab-requests" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">Solicitações</button>
+          <button id="tab-bank" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">Banco de Horas</button>
           <button id="tab-users" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">Gerenciamento</button>
           <button id="tab-settings" class="whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">Configurações</button>
         </nav>
@@ -225,6 +226,28 @@ label:has(input[name="access_type"]:checked) { border-color: #10B981; background
           <table class="min-w-full divide-y divide-gray-200">
             <thead class="bg-gray-50"><tr><th class="th">Funcionário</th><th class="th">Data</th><th class="th">Status</th><th class="th">Mensagem/Motivo</th><th class="th">Ações</th></tr></thead>
             <tbody id="request-table-body" class="bg-white divide-y divide-gray-200"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- BANCO DE HORAS -->
+      <div id="tab-panel-bank" class="hidden space-y-6">
+        <div class="flex justify-between items-center">
+          <div>
+            <h2 class="text-xl font-bold">Gestão de Banco de Horas</h2>
+            <p class="text-sm text-gray-600">Acompanhe e gerencie os saldos de horas gerais de todos os colaboradores em tempo real.</p>
+          </div>
+          <input type="text" id="bank-search-filter" class="p-2 border rounded-md w-72" placeholder="Pesquisar funcionário...">
+        </div>
+        <div class="overflow-x-auto border rounded-lg">
+          <table class="min-w-full divide-y divide-gray-200">
+            <thead class="bg-gray-50"><tr>
+              <th class="th">Funcionário</th>
+              <th class="th">E-mail</th>
+              <th class="th text-center">Saldo Atual do Banco</th>
+              <th class="th text-right">Ações</th>
+            </tr></thead>
+            <tbody id="bank-management-table-body" class="bg-white divide-y divide-gray-200"></tbody>
           </table>
         </div>
       </div>
@@ -330,6 +353,52 @@ label:has(input[name="access_type"]:checked) { border-color: #10B981; background
   <div class="flex justify-end gap-3 mt-6">
     <button id="cancel-edit-user-btn" class="py-2 px-4 rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200">Cancelar</button>
     <button id="save-edit-user-btn" class="py-2 px-4 rounded-md text-white bg-green-600 hover:bg-green-700 shadow-sm">Salvar</button>
+  </div>
+</div></div>
+
+<!-- Gerenciar Banco de Horas de Usuário Específico -->
+<div id="bank-manage-modal" class="modal"><div class="modal-content large">
+  <span id="close-bank-modal" class="xbtn">&times;</span>
+  <h3 class="text-lg font-bold mb-2 border-b pb-2">Gerenciar Banco de Horas</h3>
+  <div class="space-y-4 mt-2">
+    <div class="flex justify-between bg-gray-50 p-3 rounded border items-center">
+      <div>
+        <p><strong>Funcionário:</strong> <span id="bm-user-name" class="font-medium"></span></p>
+        <p class="text-xs text-gray-500">Extrato completo de lançamentos e banco de horas</p>
+      </div>
+      <div class="text-right bg-white p-2 rounded border shadow-sm">
+        <p class="text-xs text-gray-500 uppercase font-bold">Saldo Atual</p>
+        <p id="bm-user-balance" class="text-lg font-bold">--:--</p>
+      </div>
+    </div>
+
+    <!-- Ajuste manual admin -->
+    <div class="p-4 bg-indigo-50 border border-indigo-100 rounded-lg">
+      <h4 class="font-bold text-indigo-900 text-sm mb-2">Lançamento / Ajuste Manual de Horas no Banco</h4>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end">
+        <div><label class="block text-xs font-medium text-gray-700 mb-1">Tipo de Ajuste:</label>
+          <select id="bm-adj-type" class="p-2 border rounded-md w-full text-sm"><option value="credit">Crédito (Adicionar Horas)</option><option value="debit">Débito (Descontar Horas)</option></select></div>
+        <div><label class="block text-xs font-medium text-gray-700 mb-1">Quantidade (Horas):</label><input type="time" id="bm-adj-hours" class="p-2 border rounded-md w-full text-sm"></div>
+        <button id="bm-save-adj-btn" class="py-2 px-4 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm font-medium shadow-sm">Aplicar Ajuste</button>
+      </div>
+      <div class="mt-2"><label class="block text-xs font-medium text-gray-700 mb-1">Motivo / Descrição do Ajuste:</label>
+        <input type="text" id="bm-adj-reason" class="p-2 border rounded-md w-full text-sm" placeholder="Ex: Ajuste acordado em coordenação, hora extra manual..."></div>
+      <p id="bm-adj-msg" class="text-xs mt-2 text-center font-medium"></p>
+    </div>
+
+    <div>
+      <h4 class="font-bold text-gray-800 text-sm mb-2">Histórico Detalhado do Banco</h4>
+      <div class="max-h-56 overflow-y-auto border rounded-lg">
+        <table class="min-w-full divide-y divide-gray-200 text-sm">
+          <thead class="bg-gray-50 sticky top-0"><tr>
+            <th class="px-3 py-2 text-left font-semibold text-gray-700">Data</th>
+            <th class="px-3 py-2 text-left font-semibold text-gray-700">Descrição / Motivo</th>
+            <th class="px-3 py-2 text-right font-semibold text-gray-700">Valor (Horas)</th>
+          </tr></thead>
+          <tbody id="bm-details-body" class="bg-white divide-y divide-gray-100"></tbody>
+        </table>
+      </div>
+    </div>
   </div>
 </div></div>
 
@@ -577,27 +646,24 @@ const KIND_CHIP = { abono: 'text-green-600 bg-green-100 border border-green-200'
 
 function applyRequestToDay(workedMs, req) {
   const k = kindOf(req);
-  // Usa o valor aprovado pelo admin, se existir. Senão, usa o provisório solicitado (se houver).
   const min = req.abonoMinutes != null ? req.abonoMinutes : req.requestedAbonoMinutes;
   const a = min != null ? min * 60000 : null;
   const diff = workedMs - WORKDAY_MS;
   
-  // Se for Abono OU Compensação (não consome do saldo geral, neutraliza o déficit)
   if (k === 'abono' || k === 'compensacao') { 
     if (a !== null) return { ms: workedMs + a - WORKDAY_MS, label: KIND_LABEL[k] };
-    return { ms: diff < 0 ? 0 : diff, label: KIND_LABEL[k] }; // Se vazio, zera o déficit (perdoa). Mantém hora extra se houver.
+    return { ms: diff < 0 ? 0 : diff, label: KIND_LABEL[k] };
   }
   
-  // Banco de Horas: Consome o déficit do banco (diminui o saldo ou soma horas extras)
   if (k === 'banco') {
-    if (a !== null) return { ms: -a, label: KIND_LABEL[k] }; // Abate a quantidade específica informada pelo admin (ex: -02:00)
-    return { ms: diff, label: KIND_LABEL[k] }; // Abate o déficit real integral do dia ou soma o extra
+    if (a !== null) return { ms: -a, label: KIND_LABEL[k] };
+    return { ms: diff, label: KIND_LABEL[k] };
   }
 
   return { ms: diff, label: KIND_LABEL[k] };
 }
 
-/* ---------- Cálculo único do dia (usado em relatório, histórico e saldo geral) ---------- */
+/* ---------- Cálculo único do dia ---------- */
 function evalDay(date, entries, reqs, todayS) {
   const sorted = [...entries].sort((a, b) => a.timestamp.toMillis() - b.timestamp.toMillis());
   const ins = sorted.filter(e => e.type === 'in'), outs = sorted.filter(e => e.type === 'out');
@@ -627,7 +693,6 @@ function evalDay(date, entries, reqs, todayS) {
     r.state = 'absent'; r.balance = -WORKDAY_MS; 
   }
 
-  // Não consumir automaticamente: Reflete provisoriamente o pedido que está pendente de aprovação
   if (pending) {
     const a = applyRequestToDay(worked, pending);
     r.balance = a.ms; 
@@ -689,8 +754,8 @@ function setKind(p, kind = 'abono', until = '') {
   $(`${p}-until-box`).classList.toggle('hidden', kind !== 'compensacao');
 }
 bindKind('qe');
-bindKind('jm', k => $('jm-hours-box').classList.remove('hidden')); // Mantem visivel p/ permitir override
-bindKind('ja', k => $('ja-hours-box').classList.remove('hidden')); // Mantem visivel p/ permitir override
+bindKind('jm', k => $('jm-hours-box').classList.remove('hidden'));
+bindKind('ja', k => $('ja-hours-box').classList.remove('hidden'));
 
 /* ============================ ESTADO ============================ */
 let unsubAdmin = { users: null, requests: null, closures: null };
@@ -701,6 +766,7 @@ let requestToAction = null, motiveToEdit = null, userToEdit = null, justifyActio
 let reportCtx = null, reportRows = [], reportMeta = null, lastReport = null;
 let allUserEntries = [], allUserRequestsData = [], currentRequestDate = null;
 let grandTotalDetailsList = [], currentGrandTotalMs = 0, motivesStarted = false;
+let activeBankUser = null;
 
 /* ============================ MOTIVOS ============================ */
 function listenToMotives() {
@@ -823,7 +889,7 @@ $('forgot-password-form').addEventListener('submit', async (e) => {
 
 window.addEventListener('click', (e) => {
   const t = e.target;
-  if (t === $('forgot-password-modal') || t === $('request-modal') || t === $('grand-total-details-modal')) t.style.display = 'none';
+  if (t === $('forgot-password-modal') || t === $('request-modal') || t === $('grand-total-details-modal') || t === $('bank-manage-modal')) t.style.display = 'none';
   if (t === $('edit-motive-modal')) { t.style.display = 'none'; motiveToEdit = null; }
   if (t === $('edit-user-modal')) { t.style.display = 'none'; userToEdit = null; }
   if (t === $('justify-action-modal')) { t.style.display = 'none'; justifyActionContext = null; }
@@ -843,11 +909,11 @@ function listenToFirebaseAdmin(role, team) {
     const rf = $('request-user-filter').value;
     $('request-user-filter').innerHTML = '<option value="">Todos os Funcionários</option>' + filteredEmployees.map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join('');
     $('request-user-filter').value = rf;
-    renderUsersManagement(); renderRequests(); renderBell();
+    renderUsersManagement(); renderRequests(); renderBell(); renderBankManagementTable();
   });
   unsubAdmin.requests = onSnapshot(query(collection(db, `artifacts/${appId}/requests`), orderBy('createdAt', 'desc')), (snap) => {
     allAdminRequests = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderRequests(); renderBell();
+    renderRequests(); renderBell(); renderBankManagementTable();
   });
   unsubAdmin.closures = onSnapshot(collection(db, `artifacts/${appId}/closures`), (snap) => {
     closures = {}; snap.docs.forEach(d => closures[d.id] = { id: d.id, ...d.data() });
@@ -879,6 +945,124 @@ function renderBell() {
 }
 $('requests-notification-icon').addEventListener('click', e => { e.stopPropagation(); $('requests-notification-popover').classList.toggle('hidden'); });
 document.addEventListener('click', () => $('requests-notification-popover').classList.add('hidden'));
+
+/* ============================ ADMIN: GESTÃO DO BANCO DE HORAS ============================ */
+async function renderBankManagementTable() {
+  const body = $('bank-management-table-body'); if (!body) return;
+  body.innerHTML = '<tr><td colspan="4" class="px-6 py-6 text-center text-gray-500">Carregando saldos de banco de horas...</td></tr>';
+  const term = ($('bank-search-filter').value || '').toLowerCase();
+  const emps = filteredEmployees.filter(u => (u.name || '').toLowerCase().includes(term) || (u.email || '').toLowerCase().includes(term));
+  
+  if (!emps.length) { body.innerHTML = '<tr><td colspan="4" class="px-6 py-4 text-center text-gray-500">Nenhum funcionário encontrado.</td></tr>'; return; }
+  
+  body.innerHTML = '';
+  for (const emp of emps) {
+    const tot = await fetchUserGlobalBalance(emp.id);
+    const tr = document.createElement('tr'); tr.className = 'hover:bg-gray-50 border-b';
+    tr.innerHTML = `<td class="px-6 py-4 font-medium text-gray-800">${esc(emp.name)}</td>
+      <td class="px-6 py-4 text-gray-600 text-sm">${esc(emp.email || '---')}</td>
+      <td class="px-6 py-4 text-center font-bold text-base ${tot >= 0 ? 'text-green-600' : 'text-red-600'}">${tot !== null ? fmtMs(tot, true) : '---'}</td>
+      <td class="px-6 py-4 text-right"><button data-uid="${emp.id}" class="manage-bank-btn py-1.5 px-3 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded text-sm font-semibold">Gerar / Extrato</button></td>`;
+    tr.querySelector('.manage-bank-btn').addEventListener('click', () => openBankModal(emp));
+    body.appendChild(tr);
+  }
+}
+$('bank-search-filter').addEventListener('input', renderBankManagementTable);
+
+async function openBankModal(emp) {
+  activeBankUser = emp;
+  $('bm-user-name').textContent = emp.name;
+  $('bm-user-balance').textContent = 'Calculando...';
+  $('bm-user-balance').className = 'text-lg font-bold text-gray-500';
+  $('bm-adj-hours').value = ''; $('bm-adj-reason').value = ''; $('bm-adj-msg').textContent = '';
+  $('bank-manage-modal').style.display = 'flex';
+  
+  const body = $('bm-details-body'); body.innerHTML = '<tr><td colspan="3" class="px-3 py-4 text-center text-gray-500">Carregando extrato...</td></tr>';
+  
+  try {
+    const eSnap = await getDocs(query(collection(db, 'artifacts', appId, 'users', emp.id, 'time_entries')));
+    const entries = eSnap.docs.map(d => ({...d.data()})).filter(e => e.timestamp);
+    const rSnap = await getDocs(query(collection(db, `artifacts/${appId}/requests`), where('userId', '==', emp.id)));
+    const reqs = rSnap.docs.map(d => ({id: d.id, ...d.data()}));
+    
+    const todayS = startOfToday();
+    const byDate = groupBy(entries, e => e.timestamp.toDate().toLocaleDateString('pt-BR'));
+    const reqsBy = groupBy(reqs, r => r.date);
+    
+    let first = null;
+    entries.forEach(e => { const d = e.timestamp.toDate(); d.setHours(0,0,0,0); if (!first || d < first) first = d; });
+    reqs.filter(r => r.status === 'approved').forEach(r => { const d = brToDate(r.date); if (!first || d < first) first = d; });
+    
+    let total = 0; let details = [];
+    if (first) {
+      for (let d = new Date(first); d <= todayS; d.setDate(d.getDate() + 1)) {
+        const date = new Date(d), ds = date.toLocaleDateString('pt-BR');
+        const ev = evalDay(date, byDate[ds] || [], reqsBy[ds] || [], todayS);
+        if (ev.balance === 0) continue;
+        total += ev.balance;
+        const reason = ev.state === 'approved' ? `${ev.label} (${ev.req.text})` : (ev.balance > 0 ? 'Horas Extras' : 'Débito de Horas');
+        details.push({ date: ds, diffMs: ev.balance, reason });
+      }
+    }
+    
+    $('bm-user-balance').textContent = fmtMs(total, true);
+    $('bm-user-balance').className = `text-lg font-bold ${total >= 0 ? 'text-green-600' : 'text-red-600'}`;
+    
+    body.innerHTML = '';
+    if (!details.length) { body.innerHTML = '<tr><td colspan="3" class="px-3 py-4 text-center text-gray-500">Nenhum lançamento registrado no banco.</td></tr>'; return; }
+    
+    details.sort((a,b) => brToDate(b.date) - brToDate(a.date)).forEach(i => {
+      const tr = document.createElement('tr'); tr.className = 'border-b hover:bg-gray-50';
+      tr.innerHTML = `<td class="px-3 py-2 font-medium text-gray-700">${i.date}</td>
+        <td class="px-3 py-2 text-gray-600">${esc(i.reason)}</td>
+        <td class="px-3 py-2 text-right font-bold ${i.diffMs > 0 ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'} rounded">${fmtMs(i.diffMs, true)}</td>`;
+      body.appendChild(tr);
+    });
+  } catch (err) {
+    console.error(err);
+    body.innerHTML = '<tr><td colspan="3" class="px-3 py-4 text-center text-red-500">Erro ao carregar histórico.</td></tr>';
+  }
+}
+$('close-bank-modal').addEventListener('click', () => { $('bank-manage-modal').style.display = 'none'; activeBankUser = null; });
+
+$('bm-save-adj-btn').addEventListener('click', async () => {
+  if (!activeBankUser) return;
+  const type = $('bm-adj-type').value;
+  const timeVal = $('bm-adj-hours').value;
+  const reason = $('bm-adj-reason').value.trim();
+  const msg = $('bm-adj-msg');
+  
+  const min = timeToMin(timeVal);
+  if (!min || min <= 0) { msg.textContent = 'Informe uma quantidade de horas válida.'; msg.className = 'text-xs mt-2 text-center font-medium text-red-600'; return; }
+  if (!reason) { msg.textContent = 'Informe um motivo ou descrição para o ajuste.'; msg.className = 'text-xs mt-2 text-center font-medium text-red-600'; return; }
+  
+  $('bm-save-adj-btn').disabled = true;
+  msg.textContent = 'Aplicando ajuste...'; msg.className = 'text-xs mt-2 text-center font-medium text-blue-600';
+  
+  try {
+    const ds = new Date().toLocaleDateString('pt-BR');
+    const multiplier = type === 'credit' ? 1 : -1;
+    const abonoMinutes = min * multiplier;
+    
+    await addDoc(collection(db, `artifacts/${appId}/requests`), {
+      userId: activeBankUser.id,
+      userName: activeBankUser.name,
+      date: ds,
+      text: `[Ajuste Administrativo] ${reason}`,
+      status: 'approved',
+      kind: 'banco',
+      abonoMinutes,
+      createdAt: Timestamp.now()
+    });
+    
+    msg.textContent = 'Ajuste aplicado com sucesso!'; msg.className = 'text-xs mt-2 text-center font-medium text-green-600';
+    setTimeout(() => { openBankModal(activeBankUser); renderBankManagementTable(); }, 800);
+  } catch (err) {
+    console.error(err);
+    msg.textContent = 'Erro ao aplicar ajuste.'; msg.className = 'text-xs mt-2 text-center font-medium text-red-600';
+  }
+  $('bm-save-adj-btn').disabled = false;
+});
 
 /* ============================ ADMIN: RELATÓRIO ============================ */
 async function loadOccurrence(userId, month, year) {
@@ -1018,7 +1202,6 @@ async function loadAndRenderEditableHistory(userId, startDate, endDate) {
   await loadOccurrence(userId, parseInt(sm), parseInt(sy));
 }
 
-// delegação de cliques na tabela do relatório
 $('report-table-body').addEventListener('click', async (e) => {
   const b = e.target.closest('button[data-act]'); if (!b || !reportCtx) return;
   const { act, date, req } = b.dataset, uid = reportCtx.userId;
@@ -1070,7 +1253,7 @@ $('reopen-period-btn').addEventListener('click', async () => {
   try { await deleteDoc(doc(db, `artifacts/${appId}/closures`, `${uid}_${ref}`)); refreshReport(); } catch { alert('Erro ao reabrir.'); }
 });
 
-/* ---------- PDF (cabe em 1 página para períodos de até ~35 dias) ---------- */
+/* ---------- PDF ---------- */
 const toFileDate = d => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
 $('download-pdf-btn').addEventListener('click', () => {
   if (!reportMeta || !reportRows.length) return alert('Gere o relatório primeiro.');
@@ -1080,7 +1263,6 @@ $('download-pdf-btn').addEventListener('click', () => {
   const pageW = pdf.internal.pageSize.getWidth(), pageH = pdf.internal.pageSize.getHeight();
   const M = 12, fmt = d => d.toLocaleDateString('pt-BR');
 
-  // Cabeçalho compacto
   pdf.setFontSize(9); pdf.setTextColor(100);
   pdf.text('Defensoria Pública do Estado do Rio de Janeiro - Coordenação de Gestão Documental', pageW / 2, 10, { align: 'center' });
   pdf.setFontSize(13); pdf.setTextColor(0);
@@ -1096,12 +1278,11 @@ $('download-pdf-btn').addEventListener('click', () => {
     pdf.setTextColor(0); startY = 36;
   }
 
-  // Espaço reservado abaixo da tabela: saldo + ocorrência + assinaturas + rodapé
   const occ = $('occurrence-details').value.trim();
   const occLines = occ ? pdf.splitTextToSize(occ, pageW - 2 * M) : [];
   const reserve = 8 + (occLines.length ? 6 + occLines.length * 3.6 + 3 : 0) + 22 + 10;
   const avail = pageH - startY - reserve;
-  const rowH = avail / (reportRows.length + 1);                  // altura disponível por linha (mm)
+  const rowH = avail / (reportRows.length + 1);
   const fontSize = Math.max(5.5, Math.min(8, (rowH - 1.2) / 0.4057));
   const padV = Math.max(0.4, Math.min(2, (rowH - fontSize * 0.4057) / 2));
 
@@ -1121,7 +1302,7 @@ $('download-pdf-btn').addEventListener('click', () => {
   });
 
   let y = pdf.lastAutoTable.finalY + 6;
-  if (y > pageH - 40) { pdf.addPage(); y = 15; }   // só se o período for muito longo
+  if (y > pageH - 40) { pdf.addPage(); y = 15; }
   pdf.setFontSize(10); pdf.setTextColor(0); pdf.setFont(undefined, 'bold');
   pdf.text(`Saldo total do período: ${fmtMs(reportMeta.totalBalanceMs, true)}`, M, y);
   pdf.setFont(undefined, 'normal'); y += 6;
@@ -1133,7 +1314,6 @@ $('download-pdf-btn').addEventListener('click', () => {
     y += 3;
   }
 
-  // Assinaturas fixas no fim da página
   const sigY = Math.max(y + 12, pageH - 22);
   if (sigY > pageH - 12) { pdf.addPage(); y = 30; }
   const sy = sigY > pageH - 12 ? 30 : sigY;
@@ -1228,7 +1408,6 @@ function showJustifyActionModal(dateIso, userId) {
     $('ja-modal-existing-req').classList.add('hidden'); sel.value = ''; $('ja-modal-hours').value = ''; setKind('ja');
   }
   
-  // Ocultado o Toggle original, a caixinha de horas sempre aparecerá.
   $('ja-hours-box').classList.remove('hidden'); 
   
   document.querySelectorAll('input[name="ja_decision"]').forEach(r => r.checked = false);
@@ -1256,7 +1435,6 @@ $('save-ja-btn').addEventListener('click', async () => {
   const { kind, compensateUntil } = readKind('ja');
   if (decision === 'approved' && kind === 'compensacao' && !compensateUntil) return setMsg(msg, 'Informe até quando será a compensação.', 'red');
   
-  // Independente do kind, permitimos registrar os abonoMinutes se preenchidos
   const abonoMinutes = decision === 'approved' ? timeToMin($('ja-modal-hours').value) : null;
   
   $('save-ja-btn').disabled = true;
@@ -1385,7 +1563,6 @@ function showRequestActionModal(req) {
   det.classList.add('hidden'); 
   $('req-modal-abono').value = '';
   
-  // Removido o toggle, a caixa de horas fica sempre visível para ajustes se desejado pelo admin
   $('req-modal-abono-box').classList.remove('hidden');
 
   if (kind === 'abono') {
@@ -1438,12 +1615,17 @@ $('decline-batch-btn').addEventListener('click', () => actOnBatch('declined'));
 
 /* ============================ ADMIN: TABS E FILTROS ============================ */
 function switchTab(tab, panel) {
-  ['tab-reports', 'tab-requests', 'tab-users', 'tab-settings'].forEach(id => $(id).classList.remove('border-green-500', 'text-green-600'));
-  ['tab-panel-reports', 'tab-panel-requests', 'tab-panel-users', 'tab-panel-settings'].forEach(id => $(id).classList.add('hidden'));
+  ['tab-reports', 'tab-requests', 'tab-bank', 'tab-users', 'tab-settings'].forEach(id => {
+    const t = $(id); if (t) t.classList.remove('border-green-500', 'text-green-600');
+  });
+  ['tab-panel-reports', 'tab-panel-requests', 'tab-panel-bank', 'tab-panel-users', 'tab-panel-settings'].forEach(id => {
+    const p = $(id); if (p) p.classList.add('hidden');
+  });
   tab.classList.add('border-green-500', 'text-green-600'); panel.classList.remove('hidden');
+  if (panel === $('tab-panel-bank')) renderBankManagementTable();
 }
-[['tab-reports', 'tab-panel-reports'], ['tab-requests', 'tab-panel-requests'], ['tab-users', 'tab-panel-users'], ['tab-settings', 'tab-panel-settings']]
-  .forEach(([t, p]) => $(t).addEventListener('click', () => switchTab($(t), $(p))));
+[['tab-reports', 'tab-panel-reports'], ['tab-requests', 'tab-panel-requests'], ['tab-bank', 'tab-panel-bank'], ['tab-users', 'tab-panel-users'], ['tab-settings', 'tab-panel-settings']]
+  .forEach(([t, p]) => $(t)?.addEventListener('click', () => switchTab($(t), $(p))));
 
 ['request-user-status-filter', 'request-user-filter', 'request-start-date-filter', 'request-end-date-filter'].forEach(id => $(id).addEventListener('change', renderRequests));
 $('request-search-filter').addEventListener('input', renderRequests);
@@ -1555,7 +1737,6 @@ function renderUserApp() {
 
   calculateGrandTotalUser();
 
-  // banner de fechamento
   const mine = Object.values(closures).sort((a, b) => b.refMonth.localeCompare(a.refMonth));
   const banner = $('period-closed-banner');
   if (mine.length) {
@@ -1568,7 +1749,6 @@ function renderUserApp() {
   const overdue = allUserRequestsData.some(r => kindOf(r) === 'compensacao' && r.status === 'approved' && r.compensateUntil && r.compensateUntil < t);
   $('comp-alert-banner').classList.toggle('hidden', !(overdue && currentGrandTotalMs < 0));
 
-  // seletor de período (ref.)
   const refs = new Set([refMonthOf(new Date())]);
   allUserEntries.forEach(e => refs.add(refMonthOf(e.timestamp.toDate())));
   allUserRequestsData.forEach(r => refs.add(refMonthOf(brToDate(r.date))));
@@ -1582,7 +1762,7 @@ function renderUserApp() {
 $('period-select').addEventListener('change', renderHistoryUser);
 
 const ICON_REQ = '<svg class="w-6 h-6 text-indigo-500 hover:text-indigo-700" fill="currentColor" viewBox="0 0 20 20"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"></path><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"></path></svg>';
-const ICON_NEW = '<svg class="w-6 h-6 text-gray-400 hover:text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>';
+const ICON_NEW = '<svg class="w-6 h-6 text-gray-400 hover:text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>';
 const chip = (txt, cls) => `<span class="text-xs font-semibold px-2 py-1 rounded-full ${cls}">${txt}</span>`;
 
 function renderHistoryUser() {
@@ -1643,7 +1823,6 @@ $('view-grand-total-details-btn').addEventListener('click', () => {
 });
 $('close-grand-total-details-modal').addEventListener('click', () => { $('grand-total-details-modal').style.display = 'none'; });
 
-/* ---------- Solicitações do estagiário ---------- */
 const curKind = () => document.querySelector('input[name="req_kind"]:checked').value;
 function updateRangeSummary() {
   const on = $('req-range-toggle').checked, s = $('req-range-start').value, e = $('req-range-end').value, box = $('req-range-summary');
@@ -1748,7 +1927,6 @@ $('request-form').addEventListener('submit', async (e) => {
   } catch (err) { console.log(err); say('Erro ao enviar.', 'red'); }
 });
 
-/* ---------- Bater ponto ---------- */
 function clock(type, btn) {
   const user = auth.currentUser; if (!user) return;
   if (isDateClosed(user.uid, new Date())) return alert('Período fechado. Procure a coordenação.');
