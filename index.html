@@ -363,8 +363,8 @@ label:has(input[name="access_type"]:checked) { border-color: #10B981; background
       </div>
       <div><label class="block font-semibold text-gray-800 mb-1">Modalidade:</label><div id="ja-kind-slot"></div></div>
       <div id="ja-hours-box">
-        <label class="block font-semibold text-gray-800 mb-1">Horas a Abonar / Creditar:
-          <span class="text-xs font-normal text-gray-500 ml-1">(deixe em branco para abonar o dia inteiro)</span></label>
+        <label class="block font-semibold text-gray-800 mb-1">Horas a Abonar / Ajustar:
+          <span class="text-xs font-normal text-gray-500 ml-1">(deixe em branco para o dia inteiro)</span></label>
         <input type="time" id="ja-modal-hours" class="w-40 px-3 py-2 border rounded-md text-lg">
       </div>
       <div>
@@ -409,7 +409,7 @@ label:has(input[name="access_type"]:checked) { border-color: #10B981; background
     </div>
     <div><label class="block text-sm font-medium text-gray-700 mb-1">Modalidade:</label><div id="jm-kind-slot"></div></div>
     <div id="jm-hours-box">
-      <label class="block text-sm font-medium text-gray-700 mb-1">Horas a Abonar (opcional):</label>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Horas a Abonar/Ajustar (opcional):</label>
       <input type="time" id="justify-hours" class="w-full px-3 py-2 border rounded-md">
       <p class="text-xs text-gray-500 mt-1">Para abonar o dia todo sem batidas, deixe em branco ou informe a carga completa (ex: 06:00).</p>
     </div>
@@ -430,10 +430,11 @@ label:has(input[name="access_type"]:checked) { border-color: #10B981; background
     </div>
     <div><p class="font-medium text-gray-700 mb-1">Motivo / Justificativa do Funcionário:</p><p id="req-modal-text" class="p-3 bg-gray-50 border rounded-md text-gray-800"></p></div>
     <div id="req-modal-requested-details" class="hidden bg-blue-50 p-4 rounded-md border border-blue-200 shadow-sm"><p id="req-modal-requested-hours-text" class="font-medium text-blue-800"></p></div>
+    
     <div id="req-modal-abono-box" class="mt-6 border-t pt-4">
-      <label class="block font-bold text-gray-800 mb-1">Aprovar Abono / Horas a Creditar:</label>
+      <label class="block font-bold text-gray-800 mb-1">Abonar / Ajustar Horas (Aprovação):</label>
       <div class="flex items-center gap-2"><input type="time" id="req-modal-abono" class="w-40 px-3 py-2 border rounded-md text-lg">
-        <span class="text-xs text-gray-500">Deixe em branco para abonar o dia inteiro.</span></div>
+        <span class="text-xs text-gray-500">Deixe em branco para aplicar ao dia inteiro.</span></div>
     </div>
   </div>
   <p id="req-modal-message" class="text-sm mt-4 text-center"></p>
@@ -564,8 +565,17 @@ const KIND_CHIP = { abono: 'text-green-600 bg-green-100 border border-green-200'
 
 function applyRequestToDay(workedMs, req) {
   const k = kindOf(req);
-  if (k === 'abono') { const a = (req.abonoMinutes || 0) * 60000; return { ms: a > 0 ? workedMs + a - WORKDAY_MS : 0, label: KIND_LABEL.abono }; }
-  return { ms: workedMs - WORKDAY_MS, label: KIND_LABEL[k] };
+  const a = req.abonoMinutes != null ? req.abonoMinutes * 60000 : null;
+  
+  // Se for Abono OU Compensação (para não consumir do saldo automaticamente),
+  // se deixado em branco, zera o déficit (não consome do saldo geral).
+  if (k === 'abono' || k === 'compensacao') { 
+    return { ms: a !== null ? workedMs + a - WORKDAY_MS : 0, label: KIND_LABEL[k] }; 
+  }
+  
+  // Banco de Horas: Ocultar o déficit consome do banco. 
+  // O admin pode alterar a qtde aprovada na caixinha, ou se em branco desconta todo o dia.
+  return { ms: a !== null ? workedMs + a - WORKDAY_MS : workedMs - WORKDAY_MS, label: KIND_LABEL[k] };
 }
 
 /* ---------- Cálculo único do dia (usado em relatório, histórico e saldo geral) ---------- */
@@ -617,8 +627,8 @@ function setKind(p, kind = 'abono', until = '') {
   $(`${p}-until-box`).classList.toggle('hidden', kind !== 'compensacao');
 }
 bindKind('qe');
-bindKind('jm', k => $('jm-hours-box').classList.toggle('hidden', k !== 'abono'));
-bindKind('ja', k => $('ja-hours-box').classList.toggle('hidden', k !== 'abono'));
+bindKind('jm', k => $('jm-hours-box').classList.remove('hidden')); // Mantem visivel p/ permitir override
+bindKind('ja', k => $('ja-hours-box').classList.remove('hidden')); // Mantem visivel p/ permitir override
 
 /* ============================ ESTADO ============================ */
 let unsubAdmin = { users: null, requests: null, closures: null };
@@ -1145,7 +1155,10 @@ function showJustifyActionModal(dateIso, userId) {
   } else {
     $('ja-modal-existing-req').classList.add('hidden'); sel.value = ''; $('ja-modal-hours').value = ''; setKind('ja');
   }
-  $('ja-hours-box').classList.toggle('hidden', $('ja-kind').value !== 'abono');
+  
+  // Ocultado o Toggle original, a caixinha de horas sempre aparecerá.
+  $('ja-hours-box').classList.remove('hidden'); 
+  
   document.querySelectorAll('input[name="ja_decision"]').forEach(r => r.checked = false);
   paintDecision();
   $('ja-modal-message').textContent = ''; $('justify-action-modal').style.display = 'flex';
@@ -1170,7 +1183,10 @@ $('save-ja-btn').addEventListener('click', async () => {
   if (!reason) return setMsg(msg, 'Informe o motivo.', 'red');
   const { kind, compensateUntil } = readKind('ja');
   if (decision === 'approved' && kind === 'compensacao' && !compensateUntil) return setMsg(msg, 'Informe até quando será a compensação.', 'red');
-  const abonoMinutes = decision === 'approved' && kind === 'abono' ? timeToMin($('ja-modal-hours').value) : null;
+  
+  // Independente do kind, permitimos registrar os abonoMinutes se preenchidos
+  const abonoMinutes = decision === 'approved' ? timeToMin($('ja-modal-hours').value) : null;
+  
   $('save-ja-btn').disabled = true;
   try {
     const { userId, userName, dateString, existingRequest } = justifyActionContext;
@@ -1250,7 +1266,7 @@ $('save-justify-btn').addEventListener('click', async () => {
   if (!reason) return setMsg(msg, 'Motivo obrigatório.', 'red');
   const { kind, compensateUntil } = readKind('jm');
   if (kind === 'compensacao' && !compensateUntil) return setMsg(msg, 'Informe até quando será a compensação.', 'red');
-  const am = kind === 'abono' ? timeToMin($('justify-hours').value) : null;
+  const am = timeToMin($('justify-hours').value);
   try {
     await addDoc(collection(db, `artifacts/${appId}/requests`), {
       userId, userName: allUsers.find(u => u.id === userId).name, date: date.toLocaleDateString('pt-BR'),
@@ -1282,9 +1298,14 @@ function showRequestActionModal(req) {
   let text = req.text || '';
   if (req.batchId) text += `  [Período: ${isoToBR(req.batchStart)} a ${isoToBR(req.batchEnd)}]`;
   $('req-modal-text').textContent = text;
+  
   const kind = kindOf(req), det = $('req-modal-requested-details'), dtxt = $('req-modal-requested-hours-text');
-  det.classList.add('hidden'); $('req-modal-abono').value = '';
-  $('req-modal-abono-box').classList.toggle('hidden', kind !== 'abono');
+  det.classList.add('hidden'); 
+  $('req-modal-abono').value = '';
+  
+  // Removido o toggle, a caixa de horas fica sempre visível para ajustes se desejado pelo admin
+  $('req-modal-abono-box').classList.remove('hidden');
+
   if (kind === 'abono') {
     if (req.requestedAbonoMinutes) {
       det.classList.remove('hidden');
@@ -1294,7 +1315,7 @@ function showRequestActionModal(req) {
   } else {
     det.classList.remove('hidden');
     dtxt.innerHTML = kind === 'banco' ? '🏦 <strong>Uso de banco de horas</strong> – o déficit será descontado do saldo do funcionário.'
-      : `🔁 <strong>Compensação futura</strong> – até <strong>${isoToBR(req.compensateUntil) || '(sem data)'}</strong>. O déficit permanece no saldo até a reposição.`;
+      : `🔁 <strong>Compensação futura</strong> – até <strong>${isoToBR(req.compensateUntil) || '(sem data)'}</strong>. <br><span class="text-xs text-gray-600 font-normal">O déficit deste dia não será consumido do saldo de horas.</span>`;
   }
   const sibs = req.batchId ? allAdminRequests.filter(r => r.batchId === req.batchId && r.status === 'pending') : [];
   const show = sibs.length > 1;
@@ -1305,7 +1326,7 @@ function showRequestActionModal(req) {
 const closeReqAction = () => { $('request-action-modal').style.display = 'none'; };
 $('cancel-req-action-btn').addEventListener('click', () => { closeReqAction(); requestToAction = null; });
 
-function currentAbono() { return kindOf(requestToAction) === 'abono' ? timeToMin($('req-modal-abono').value) : null; }
+function currentAbono() { return timeToMin($('req-modal-abono').value); }
 $('approve-req-action-btn').addEventListener('click', async () => {
   if (!requestToAction) return;
   await updateDoc(doc(db, `artifacts/${appId}/requests`, requestToAction.id), { status: 'approved', abonoMinutes: currentAbono() });
@@ -1479,7 +1500,7 @@ function renderUserApp() {
 $('period-select').addEventListener('change', renderHistoryUser);
 
 const ICON_REQ = '<svg class="w-6 h-6 text-indigo-500 hover:text-indigo-700" fill="currentColor" viewBox="0 0 20 20"><path d="M2.003 5.884L10 9.882l7.997-3.998A2 2 0 0016 4H4a2 2 0 00-1.997 1.884z"></path><path d="M18 8.118l-8 4-8-4V14a2 2 0 002 2h12a2 2 0 002-2V8.118z"></path></svg>';
-const ICON_NEW = '<svg class="w-6 h-6 text-gray-400 hover:text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>';
+const ICON_NEW = '<svg class="w-6 h-6 text-gray-400 hover:text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>';
 const chip = (txt, cls) => `<span class="text-xs font-semibold px-2 py-1 rounded-full ${cls}">${txt}</span>`;
 
 function renderHistoryUser() {
