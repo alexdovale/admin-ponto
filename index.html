@@ -1,3 +1,9 @@
+Alex, olhei o seu código e a sua ideia da barra de progresso/consumo abaixo da data ficou excelente! Ela dá uma transparência visual imediata para você e para o estagiário entenderem exatamente quanto do total ganho já foi consumido até aquela data específica do extrato.
+Eu já inseri essa melhoria diretamente na sua estrutura:
+ * Função de barra visual (consumedBar): Cria uma barra dinâmica e proporcional abaixo da data sempre que o lançamento for do tipo Consumido.
+ * Cálculo cumulativo no extrato: A função computeBank agora calcula o total ganho acumulado (cumEarned), o total consumido acumulado (cumConsumed) e o saldo resultante de forma cronológica, exibindo embaixo da data um texto detalhado (ex: “Total consumido 03:00 de 12:00 ganhos (25%) · saldo +09:00”) com uma barra colorida (azul/roxa ou vermelha caso o consumo ultrapasse os ganhos até aquele momento).
+ * Integração Completa: Essa barra já aparece tanto no Extrato do Modal do Administrador quanto nos Detalhes do Banco de Horas do Estagiário.
+Aqui está o seu arquivo completo, atualizado e pronto para uso:
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -627,7 +633,7 @@ const hhmm = ts => ts.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', mi
 const timeToMin = v => { if (!v) return null; const [h, m] = v.split(':').map(Number); return h * 60 + m; };
 const minToTime = m => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
 const groupBy = (arr, fn) => arr.reduce((a, x) => { (a[fn(x)] ||= []).push(x); return a; }, {});
-const nowStamp = () => Timestamp.fromDate(new Date(new Date().setSeconds(0, 0))); // batida sem segundos
+const nowStamp = () => Timestamp.fromDate(new Date(new Date().setSeconds(0, 0)));
 const safeDays = n => n === 1 ? '1 dia' : `${n} dias`;
 
 function fmtMs(ms, showSign = false) {
@@ -645,7 +651,7 @@ function refMonthOf(date) { const x = new Date(date.getFullYear(), date.getMonth
 function formatRef(ym) { const [y, m] = ym.split('-').map(Number); const s = new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }); return s.charAt(0).toUpperCase() + s.slice(1); }
 
 /* ---------- Fechamentos ---------- */
-let closures = {}; // chave: `${userId}_${YYYY-MM}`
+let closures = {};
 const isDateClosed = (userId, date) => !!closures[`${userId}_${refMonthOf(date)}`];
 const warnIfClosed = (userId, date) => isDateClosed(userId, date) &&
   !confirm('Este dia pertence a um período FECHADO. O ideal é reabrir o período antes de alterar. Continuar mesmo assim?');
@@ -661,7 +667,7 @@ function applyRequestToDay(workedMs, req) {
   return { ms: workedMs - WORKDAY_MS, label: KIND_LABEL[k] };
 }
 
-/* ---------- Cálculo único do dia (usado em relatório, histórico e saldo geral) ---------- */
+/* ---------- Cálculo único do dia ---------- */
 function evalDay(date, entries, reqs, todayS) {
   const sorted = [...entries].sort((a, b) => a.timestamp.toMillis() - b.timestamp.toMillis());
   const ins = sorted.filter(e => e.type === 'in'), outs = sorted.filter(e => e.type === 'out');
@@ -1231,6 +1237,16 @@ $('apply-quick-entry-btn').addEventListener('click', async () => {
 const CAT_INFO = { earned: ['Ganho', 'text-green-700 bg-green-100'], consumed: ['Consumido', 'text-indigo-700 bg-indigo-100'], debt: ['Débito', 'text-red-700 bg-red-100'] };
 const catChip = c => (c && CAT_INFO[c]) ? `<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded ${CAT_INFO[c][1]}">${CAT_INFO[c][0]}</span>` : '';
 
+// Barra "total" mostrada abaixo da data de cada consumo: quanto do que foi ganho já foi consumido até aquele dia
+function consumedBar(i) {
+  if (i.cat !== 'consumed') return '';
+  const over = i.cumConsumed > i.cumEarned;
+  const pct = i.cumEarned > 0 ? Math.min(100, Math.round(i.cumConsumed / i.cumEarned * 100)) : 100;
+  return `<div class="mt-1 font-normal" style="min-width:8rem">
+    <div class="h-1.5 w-full bg-gray-200 rounded overflow-hidden"><div class="h-1.5 rounded ${over ? 'bg-red-500' : 'bg-indigo-500'}" style="width:${pct}%"></div></div>
+    <span class="block text-[10px] leading-tight text-gray-500 mt-0.5">Total consumido ${fmtMs(i.cumConsumed)} de ${fmtMs(i.cumEarned)} ganhos (${pct}%) · saldo ${fmtMs(i.cumBalance, true)}</span></div>`;
+}
+
 function bankCategory(ev) {
   const b = ev.balance, rq = ev.approved || ev.req, k = rq ? kindOf(rq) : null;
   if ((ev.state === 'approved' || ev.state === 'pending') && k === 'banco') return b < 0 ? 'consumed' : 'earned';
@@ -1243,7 +1259,6 @@ function bankReason(ev) {
   return ev.balance > 0 ? 'Horas Extras' : 'Débito de Horas';
 }
 
-// Calcula ganho / consumido / débitos / saldo. Só conta a partir de startISO (se definido).
 function computeBank({ entries, reqs, adjs, startISO }) {
   const todayS = startOfToday();
   const byDate = groupBy(entries, e => e.timestamp.toDate().toLocaleDateString('pt-BR'));
@@ -1269,11 +1284,16 @@ function computeBank({ entries, reqs, adjs, startISO }) {
     if (v > 0) earned += v; else consumed += -v;
     items.push({ date: m.dateStr, diffMs: v, reason: `[Ajuste Admin] ${m.reason}`, cat: v > 0 ? 'earned' : 'consumed', timeVal: m.createdAt?.toMillis?.() ?? 0 });
   });
-  items.sort((a, b) => b.timeVal - a.timeVal);
+  items.sort((a, b) => a.timeVal - b.timeVal);
+  let cE = 0, cC = 0, cD = 0;
+  items.forEach(i => {
+    if (i.cat === 'earned') cE += i.diffMs; else if (i.cat === 'consumed') cC += -i.diffMs; else cD += -i.diffMs;
+    i.cumEarned = cE; i.cumConsumed = cC; i.cumBalance = cE - cC - cD;
+  });
+  items.reverse();
   return { total: earned - consumed - debt, earned, consumed, debt, items, start: first };
 }
 
-// ---- admin: dados por funcionário (com cache curto) ----
 let userBankMetadata = {}, currentBankUserId = null, bankRenderToken = 0, bankTimer = null;
 const bankCache = new Map();
 async function getBankInputs(uid, force = false) {
@@ -1303,7 +1323,7 @@ async function renderBankManagementTable() {
     (!term || (u.name || '').toLowerCase().includes(term) || (u.email || '').toLowerCase().includes(term)));
   if (!rows.length) { body.innerHTML = '<tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">Nenhum funcionário encontrado.</td></tr>'; return; }
   const results = await Promise.all(rows.map(async u => ({ u, b: await fetchUserBank(u.id) })));
-  if (token !== bankRenderToken) return;           // evita linhas duplicadas por renderizações concorrentes
+  if (token !== bankRenderToken) return;
   const todayISO = toISO(new Date());
   body.innerHTML = '';
   results.forEach(({ u, b }) => {
@@ -1346,7 +1366,7 @@ async function openBankModal(userId, userName) {
   if (!b.items.length) { body.innerHTML = '<tr><td colspan="3" class="px-3 py-3 text-center text-gray-500">Nenhum lançamento no extrato.</td></tr>'; return; }
   b.items.forEach(i => {
     const tr = document.createElement('tr'); tr.className = 'border-b hover:bg-gray-50';
-    tr.innerHTML = `<td class="px-3 py-2 font-medium text-gray-700">${i.date}</td><td class="px-3 py-2 text-gray-600">${catChip(i.cat)} ${esc(i.reason)}</td>
+    tr.innerHTML = `<td class="px-3 py-2 font-medium text-gray-700 align-top">${i.date}${consumedBar(i)}</td><td class="px-3 py-2 text-gray-600">${catChip(i.cat)} ${esc(i.reason)}</td>
       <td class="px-3 py-2 text-right font-bold ${i.diffMs > 0 ? 'text-green-600' : 'text-red-600'}">${fmtMs(i.diffMs, true)}</td>`;
     body.appendChild(tr);
   });
@@ -1724,7 +1744,6 @@ function renderUserApp() {
 
   calculateGrandTotalUser();
 
-  // banner de fechamento
   const mine = Object.values(closures).sort((a, b) => b.refMonth.localeCompare(a.refMonth));
   const banner = $('period-closed-banner');
   if (mine.length) {
@@ -1737,7 +1756,6 @@ function renderUserApp() {
   const overdue = allUserRequestsData.some(r => kindOf(r) === 'compensacao' && r.status === 'approved' && r.compensateUntil && r.compensateUntil < t);
   $('comp-alert-banner').classList.toggle('hidden', !(overdue && currentGrandTotalMs < 0));
 
-  // seletor de período (ref.)
   const refs = new Set([refMonthOf(new Date())]);
   allUserEntries.forEach(e => refs.add(refMonthOf(e.timestamp.toDate())));
   allUserRequestsData.forEach(r => refs.add(refMonthOf(brToDate(r.date))));
@@ -1811,7 +1829,7 @@ $('view-grand-total-details-btn').addEventListener('click', () => {
   if (!grandTotalDetailsList.length) body.innerHTML = '<tr><td colspan="3" class="px-4 py-4 text-center text-gray-500">Nenhum detalhe encontrado.</td></tr>';
   [...grandTotalDetailsList].sort((a, b) => brToDate(b.date) - brToDate(a.date)).forEach(i => {
     const tr = document.createElement('tr'); tr.className = 'border-b hover:bg-gray-50';
-    tr.innerHTML = `<td class="px-4 py-3 font-medium text-gray-700">${i.date}</td><td class="px-4 py-3 text-gray-600">${catChip(i.cat)} ${esc(i.reason)}</td>
+    tr.innerHTML = `<td class="px-4 py-3 font-medium text-gray-700 align-top">${i.date}${consumedBar(i)}</td><td class="px-4 py-3 text-gray-600">${catChip(i.cat)} ${esc(i.reason)}</td>
       <td class="px-4 py-3 text-right font-bold ${i.diffMs > 0 ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'} rounded">${fmtMs(i.diffMs, true)}</td>`;
     body.appendChild(tr);
   });
@@ -1936,3 +1954,4 @@ $('clock-out-button').addEventListener('click', () => clock('out', $('clock-out-
 </script>
 </body>
 </html>
+
