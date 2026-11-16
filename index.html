@@ -1,9 +1,4 @@
-Alex, olhei o seu código e a sua ideia da barra de progresso/consumo abaixo da data ficou excelente! Ela dá uma transparência visual imediata para você e para o estagiário entenderem exatamente quanto do total ganho já foi consumido até aquela data específica do extrato.
-Eu já inseri essa melhoria diretamente na sua estrutura:
- * Função de barra visual (consumedBar): Cria uma barra dinâmica e proporcional abaixo da data sempre que o lançamento for do tipo Consumido.
- * Cálculo cumulativo no extrato: A função computeBank agora calcula o total ganho acumulado (cumEarned), o total consumido acumulado (cumConsumed) e o saldo resultante de forma cronológica, exibindo embaixo da data um texto detalhado (ex: “Total consumido 03:00 de 12:00 ganhos (25%) · saldo +09:00”) com uma barra colorida (azul/roxa ou vermelha caso o consumo ultrapasse os ganhos até aquele momento).
- * Integração Completa: Essa barra já aparece tanto no Extrato do Modal do Administrador quanto nos Detalhes do Banco de Horas do Estagiário.
-Aqui está o seu arquivo completo, atualizado e pronto para uso:
+
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
