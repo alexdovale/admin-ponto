@@ -577,17 +577,19 @@ const KIND_CHIP = { abono: 'text-green-600 bg-green-100 border border-green-200'
 
 function applyRequestToDay(workedMs, req) {
   const k = kindOf(req);
-  const a = req.abonoMinutes != null ? req.abonoMinutes * 60000 : null;
+  // Usa o valor aprovado pelo admin, se existir. Senão, usa o provisório solicitado (se houver).
+  const min = req.abonoMinutes != null ? req.abonoMinutes : req.requestedAbonoMinutes;
+  const a = min != null ? min * 60000 : null;
+  const diff = workedMs - WORKDAY_MS;
   
-  // Se for Abono OU Compensação (para não consumir do saldo automaticamente),
-  // se deixado em branco, zera o déficit (não consome do saldo geral).
+  // Se for Abono OU Compensação (não consome do saldo geral)
   if (k === 'abono' || k === 'compensacao') { 
-    return { ms: a !== null ? workedMs + a - WORKDAY_MS : 0, label: KIND_LABEL[k] }; 
+    if (a !== null) return { ms: workedMs + a - WORKDAY_MS, label: KIND_LABEL[k] };
+    return { ms: diff < 0 ? 0 : diff, label: KIND_LABEL[k] }; // Se vazio, zera o déficit (perdoa). Mantém hora extra se houver.
   }
   
-  // Banco de Horas: Ocultar o déficit consome do banco. 
-  // O admin pode alterar a qtde aprovada na caixinha, ou se em branco desconta todo o dia.
-  return { ms: a !== null ? workedMs + a - WORKDAY_MS : workedMs - WORKDAY_MS, label: KIND_LABEL[k] };
+  // Banco de Horas: Consome o déficit do banco. 
+  return { ms: a !== null ? workedMs + a - WORKDAY_MS : diff, label: KIND_LABEL[k] };
 }
 
 /* ---------- Cálculo único do dia (usado em relatório, histórico e saldo geral) ---------- */
@@ -596,21 +598,37 @@ function evalDay(date, entries, reqs, todayS) {
   const ins = sorted.filter(e => e.type === 'in'), outs = sorted.filter(e => e.type === 'out');
   let worked = 0;
   for (let j = 0; j < Math.min(ins.length, outs.length); j++) worked += outs[j].timestamp.toMillis() - ins[j].timestamp.toMillis();
+  
   const approved = reqs.find(r => r.status === 'approved');
-  const other = reqs.find(r => r.status === 'pending') || reqs.find(r => r.status === 'declined');
-  const r = { ins, outs, worked, balance: 0, state: '', label: '', req: approved || other || null, approved };
+  const pending = reqs.find(r => r.status === 'pending');
+  const declined = reqs.find(r => r.status === 'declined');
+  const r = { ins, outs, worked, balance: 0, state: '', label: '', req: approved || pending || declined || null, approved };
   const dow = date.getDay(), weekend = dow === 0 || dow === 6;
   const isToday = date.getTime() === todayS.getTime();
+  
   if (date > todayS) { r.state = 'future'; if (approved) r.label = KIND_LABEL[kindOf(approved)]; return r; }
   if (approved) { const a = applyRequestToDay(worked, approved); r.balance = a.ms; r.label = a.label; r.state = 'approved'; return r; }
   if (weekend) { r.state = 'weekend'; return r; }
+  
   if (ins.length > 0 && ins.length === outs.length) {
     const diff = worked - WORKDAY_MS;
-    r.balance = Math.abs(diff) <= TOLERANCE_MS ? 0 : diff; r.state = 'ok'; return r;
+    r.balance = Math.abs(diff) <= TOLERANCE_MS ? 0 : diff; r.state = 'ok';
+  } else if (ins.length > outs.length) { 
+    r.state = isToday ? 'inprogress' : 'odd'; 
+    r.balance = worked - WORKDAY_MS;
+  } else if (isToday) { 
+    r.state = 'today'; 
+  } else {
+    r.state = 'absent'; r.balance = -WORKDAY_MS; 
   }
-  if (ins.length > outs.length) { r.state = isToday ? 'inprogress' : 'odd'; return r; }
-  if (isToday) { r.state = 'today'; return r; }
-  r.state = 'absent'; r.balance = -WORKDAY_MS; return r;
+
+  // Não consumir automaticamente: Reflete provisoriamente o pedido que está pendente de aprovação
+  if (pending) {
+    const a = applyRequestToDay(worked, pending);
+    r.balance = a.ms; 
+  }
+  
+  return r;
 }
 
 function workdaysBetween(sISO, eISO) {
