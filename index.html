@@ -582,14 +582,19 @@ function applyRequestToDay(workedMs, req) {
   const a = min != null ? min * 60000 : null;
   const diff = workedMs - WORKDAY_MS;
   
-  // Se for Abono OU Compensação (não consome do saldo geral)
+  // Se for Abono OU Compensação (não consome do saldo geral, neutraliza o déficit)
   if (k === 'abono' || k === 'compensacao') { 
     if (a !== null) return { ms: workedMs + a - WORKDAY_MS, label: KIND_LABEL[k] };
     return { ms: diff < 0 ? 0 : diff, label: KIND_LABEL[k] }; // Se vazio, zera o déficit (perdoa). Mantém hora extra se houver.
   }
   
-  // Banco de Horas: Consome o déficit do banco. 
-  return { ms: a !== null ? workedMs + a - WORKDAY_MS : diff, label: KIND_LABEL[k] };
+  // Banco de Horas: Consome o déficit do banco (diminui o saldo ou soma horas extras)
+  if (k === 'banco') {
+    if (a !== null) return { ms: -a, label: KIND_LABEL[k] }; // Abate a quantidade específica informada pelo admin (ex: -02:00)
+    return { ms: diff, label: KIND_LABEL[k] }; // Abate o déficit real integral do dia ou soma o extra
+  }
+
+  return { ms: diff, label: KIND_LABEL[k] };
 }
 
 /* ---------- Cálculo único do dia (usado em relatório, histórico e saldo geral) ---------- */
