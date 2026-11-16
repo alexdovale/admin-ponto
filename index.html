@@ -79,6 +79,7 @@ label:has(input[name="access_type"]:checked) { border-color: #10B981; background
       <div class="text-center p-4 bg-gray-50 rounded-lg flex flex-col justify-center items-center border border-gray-200">
         <p class="text-sm font-medium text-gray-500">SALDO TOTAL (GERAL / BANCO DE HORAS)</p>
         <p id="grand-total-balance" class="text-3xl font-bold text-gray-800">--:--</p>
+        <p id="grand-total-sub" class="text-xs text-gray-500 mt-1"></p>
         <button id="view-grand-total-details-btn" class="mt-2 text-xs font-medium text-blue-600 hover:text-blue-800 underline">Ver Detalhes</button>
       </div>
     </div>
@@ -233,28 +234,19 @@ label:has(input[name="access_type"]:checked) { border-color: #10B981; background
       <!-- BANCO DE HORAS -->
       <div id="tab-panel-bank" class="hidden space-y-6">
         <div class="flex flex-wrap items-center justify-between gap-4">
-          <h3 class="text-lg font-bold">Gestão do Banco de Horas dos Colaboradores</h3>
+          <h3 class="text-lg font-bold">Gestão do Banco de Horas</h3>
           <div class="flex flex-wrap gap-3 items-center">
-            <select id="bank-status-filter" class="p-2 border rounded-md bg-white">
-              <option value="active" selected>Estagiários Ativos</option>
-              <option value="inactive">Estagiários Inativos</option>
-              <option value="all">Todos os Status</option>
-            </select>
+            <select id="bank-status-filter" class="p-2 border rounded-md bg-white"><option value="active" selected>Estagiários Ativos</option><option value="inactive">Estagiários Inativos</option><option value="all">Todos os Status</option></select>
             <input type="text" id="bank-search-input" class="p-2 border rounded-md w-64 bg-white" placeholder="Pesquisar funcionário...">
           </div>
         </div>
+        <p class="text-xs text-gray-500"><strong>Ganho</strong> = horas extras e créditos · <strong>Consumido</strong> = horas usadas do banco (dias em "Banco de horas" e descontos administrativos) · <strong>Débitos</strong> = faltas, atrasos e compensações ainda não repostas. O saldo só conta a partir da data de início definida para cada estagiário.</p>
         <div class="overflow-x-auto border rounded-lg shadow-sm">
           <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50">
-              <tr>
-                <th class="th">Funcionário</th>
-                <th class="th">E-mail</th>
-                <th class="th">Status</th>
-                <th class="th">Saldo Atual do Banco</th>
-                <th class="th">Validade / Prazo Débito</th>
-                <th class="th">Ações</th>
-              </tr>
-            </thead>
+            <thead class="bg-gray-50"><tr>
+              <th class="th">Funcionário</th><th class="th">Status</th><th class="th">Contagem / Prazos</th>
+              <th class="th">Ganho</th><th class="th">Consumido</th><th class="th">Débitos</th><th class="th">Saldo</th><th class="th">Ações</th>
+            </tr></thead>
             <tbody id="bank-management-table-body" class="bg-white divide-y divide-gray-200"></tbody>
           </table>
         </div>
@@ -367,83 +359,56 @@ label:has(input[name="access_type"]:checked) { border-color: #10B981; background
 <!-- Modal de Gestão / Extrato do Banco de Horas -->
 <div id="bank-management-modal" class="modal"><div class="modal-content large">
   <span id="close-bank-modal" class="xbtn">&times;</span>
-  <h3 class="text-lg font-bold mb-2 border-b pb-3">Gestão de Banco de Horas</h3>
+  <h3 class="text-lg font-bold mb-2 border-b pb-3">Banco de Horas – <span id="bm-user-name"></span></h3>
   <div class="space-y-4 mt-4 text-sm">
-    <div class="flex justify-between bg-gray-50 p-3 rounded border items-center">
-      <div>
-        <p><strong>Funcionário:</strong> <span id="bm-user-name" class="font-medium"></span></p>
-        <p><strong>Saldo Consolidado:</strong> <span id="bm-user-balance" class="font-bold"></span></p>
-      </div>
-      <div class="text-right">
-        <p class="text-xs text-gray-500">Validade do Saldo Positivo: <span id="bm-validity-disp" class="font-medium text-gray-700">---</span></p>
-        <p class="text-xs text-gray-500">Prazo Limite Débito: <span id="bm-deadline-disp" class="font-medium text-gray-700">---</span></p>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+      <div class="p-2 bg-green-50 rounded border border-green-100"><p class="text-xs text-gray-500">Ganho</p><p id="bm-earned" class="font-bold text-green-700">--:--</p></div>
+      <div class="p-2 bg-indigo-50 rounded border border-indigo-100"><p class="text-xs text-gray-500">Consumido</p><p id="bm-consumed" class="font-bold text-indigo-700">--:--</p></div>
+      <div class="p-2 bg-red-50 rounded border border-red-100"><p class="text-xs text-gray-500">Débitos</p><p id="bm-debt" class="font-bold text-red-700">--:--</p></div>
+      <div class="p-2 bg-gray-50 rounded border"><p class="text-xs text-gray-500">Saldo</p><p id="bm-user-balance" class="font-bold">--:--</p></div>
+    </div>
+    <p class="text-xs text-gray-500">Contagem desde: <strong id="bm-start-disp">1º registro</strong> · Validade do saldo positivo: <strong id="bm-validity-disp">---</strong> · Prazo limite do débito: <strong id="bm-deadline-disp">---</strong></p>
+
+    <div class="p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+      <label class="block text-xs font-semibold text-yellow-900 mb-1">Início da contagem do banco de horas (dias anteriores deixam de entrar no saldo):</label>
+      <div class="flex flex-wrap gap-2 items-center">
+        <input type="date" id="bm-set-start" class="p-1.5 border rounded text-xs bg-white">
+        <button type="button" id="bm-save-start-btn" class="px-3 py-1.5 bg-yellow-600 text-white rounded text-xs hover:bg-yellow-700 font-medium">Salvar início</button>
+        <button type="button" id="bm-start-today-btn" class="px-3 py-1.5 bg-gray-200 text-gray-800 rounded text-xs hover:bg-gray-300 font-medium">Contar a partir de hoje</button>
+        <button type="button" id="bm-start-clear-btn" class="px-3 py-1.5 bg-gray-200 text-gray-800 rounded text-xs hover:bg-gray-300 font-medium">Contar desde o 1º registro</button>
       </div>
     </div>
 
-    <!-- Ajustar Prazos / Validade -->
     <div class="p-3 bg-indigo-50 border border-indigo-100 rounded-md grid sm:grid-cols-2 gap-4">
-      <div>
-        <label class="block text-xs font-semibold text-indigo-900 mb-1">Definir Validade p/ Saldo Positivo:</label>
-        <div class="flex gap-2">
-          <input type="date" id="bm-set-validity" class="p-1.5 border rounded text-xs flex-grow bg-white">
-          <button type="button" id="bm-save-validity-btn" class="px-3 py-1.5 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700 font-medium">Salvar</button>
-        </div>
-      </div>
-      <div>
-        <label class="block text-xs font-semibold text-indigo-900 mb-1">Definir Prazo Limite p/ Débito:</label>
-        <div class="flex gap-2">
-          <input type="date" id="bm-set-deadline" class="p-1.5 border rounded text-xs flex-grow bg-white">
-          <button type="button" id="bm-save-deadline-btn" class="px-3 py-1.5 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700 font-medium">Salvar</button>
-        </div>
-      </div>
+      <div><label class="block text-xs font-semibold text-indigo-900 mb-1">Validade p/ saldo positivo:</label>
+        <div class="flex gap-2"><input type="date" id="bm-set-validity" class="p-1.5 border rounded text-xs flex-grow bg-white"><button type="button" id="bm-save-validity-btn" class="px-3 py-1.5 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700 font-medium">Salvar</button></div></div>
+      <div><label class="block text-xs font-semibold text-indigo-900 mb-1">Prazo limite p/ débito:</label>
+        <div class="flex gap-2"><input type="date" id="bm-set-deadline" class="p-1.5 border rounded text-xs flex-grow bg-white"><button type="button" id="bm-save-deadline-btn" class="px-3 py-1.5 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700 font-medium">Salvar</button></div></div>
     </div>
 
-    <!-- Lançamento Manual Administrativo -->
     <div class="p-3 bg-gray-50 border rounded-md space-y-3">
-      <p class="font-semibold text-gray-800 text-xs uppercase tracking-wide">Novo Ajuste Administrativo de Horas</p>
+      <p class="font-semibold text-gray-800 text-xs uppercase tracking-wide">Novo ajuste administrativo (também serve para saldo inicial)</p>
       <div class="grid sm:grid-cols-3 gap-3 items-end">
-        <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">Tipo de Ajuste:</label>
-          <select id="bm-adj-type" class="w-full p-1.5 border rounded text-xs bg-white">
-            <option value="credit">Adicionar Crédito (+)</option>
-            <option value="debit">Descontar Débito (-)</option>
-          </select>
-        </div>
-        <div>
-          <label class="block text-xs font-medium text-gray-700 mb-1">Quantidade de Horas (HH:MM):</label>
-          <input type="time" id="bm-adj-hours" class="w-full p-1.5 border rounded text-xs bg-white" required>
-        </div>
-        <div>
-          <button type="button" id="bm-apply-adj-btn" class="w-full py-1.5 px-3 bg-green-600 text-white rounded text-xs hover:bg-green-700 font-medium">Aplicar Ajuste</button>
-        </div>
+        <div><label class="block text-xs font-medium text-gray-700 mb-1">Tipo:</label>
+          <select id="bm-adj-type" class="w-full p-1.5 border rounded text-xs bg-white"><option value="credit">Adicionar crédito (+)</option><option value="debit">Descontar (-)</option></select></div>
+        <div><label class="block text-xs font-medium text-gray-700 mb-1">Horas (HH:MM):</label><input type="time" id="bm-adj-hours" class="w-full p-1.5 border rounded text-xs bg-white"></div>
+        <button type="button" id="bm-apply-adj-btn" class="w-full py-1.5 px-3 bg-green-600 text-white rounded text-xs hover:bg-green-700 font-medium">Aplicar ajuste</button>
       </div>
-      <div>
-        <label class="block text-xs font-medium text-gray-700 mb-1">Justificativa / Descrição do Ajuste:</label>
-        <input type="text" id="bm-adj-reason" class="w-full p-1.5 border rounded text-xs bg-white" placeholder="Ex: Correção de marcação, bônus acordado...">
-      </div>
+      <input type="text" id="bm-adj-reason" class="w-full p-1.5 border rounded text-xs bg-white" placeholder="Justificativa (ex.: saldo inicial, correção de marcação...)">
       <p id="bm-adj-status" class="text-xs text-center font-medium"></p>
     </div>
 
-    <!-- Extrato Detalhado -->
     <div>
-      <p class="font-semibold text-gray-800 mb-2">Extrato do Banco de Horas</p>
+      <p class="font-semibold text-gray-800 mb-2">Extrato</p>
       <div class="max-h-56 overflow-y-auto border rounded-md">
         <table class="min-w-full divide-y divide-gray-200 text-xs">
-          <thead class="bg-gray-100 sticky top-0">
-            <tr>
-              <th class="px-3 py-2 text-left font-semibold text-gray-700">Data</th>
-              <th class="px-3 py-2 text-left font-semibold text-gray-700">Descrição / Motivo</th>
-              <th class="px-3 py-2 text-right font-semibold text-gray-700">Valor</th>
-            </tr>
-          </thead>
+          <thead class="bg-gray-100 sticky top-0"><tr><th class="px-3 py-2 text-left font-semibold text-gray-700">Data</th><th class="px-3 py-2 text-left font-semibold text-gray-700">Descrição</th><th class="px-3 py-2 text-right font-semibold text-gray-700">Valor</th></tr></thead>
           <tbody id="bm-extract-body" class="bg-white divide-y divide-gray-100"></tbody>
         </table>
       </div>
     </div>
   </div>
-  <div class="flex justify-end gap-3 mt-6 border-t pt-4">
-    <button id="close-bank-modal-btn" class="py-2 px-4 rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 text-xs font-medium">Fechar</button>
-  </div>
+  <div class="flex justify-end mt-6 border-t pt-4"><button id="close-bank-modal-btn" class="py-2 px-4 rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200 text-xs font-medium">Fechar</button></div>
 </div></div>
 
 <!-- Analisar dia (admin, a partir do relatório) -->
@@ -455,19 +420,17 @@ label:has(input[name="access_type"]:checked) { border-color: #10B981; background
       <p><strong>Funcionário:</strong> <span id="ja-modal-user-name" class="font-medium"></span></p>
       <p><strong>Data:</strong> <span id="ja-modal-date" class="font-medium"></span></p>
     </div>
-    <div class="bg-blue-50 p-3 rounded border border-blue-200 flex justify-between items-center">
-      <div>
-        <p class="font-semibold text-blue-800 mb-1">Situação atual do dia:</p>
-        <div class="grid grid-cols-3 gap-4 text-center mt-2">
-          <div><p class="text-xs text-blue-600 font-medium">Entrada</p><p id="ja-modal-in" class="font-bold text-blue-900">--:--</p></div>
-          <div><p class="text-xs text-blue-600 font-medium">Saída</p><p id="ja-modal-out" class="font-bold text-blue-900">--:--</p></div>
-          <div><p class="text-xs text-blue-600 font-medium">Trabalhado</p><p id="ja-modal-worked" class="font-bold text-blue-900">--:--</p></div>
-        </div>
+    <div class="bg-blue-50 p-3 rounded border border-blue-200">
+      <p class="font-semibold text-blue-800 mb-1">Situação atual do dia:</p>
+      <div class="grid grid-cols-3 gap-2 text-center mt-2">
+        <div><p class="text-xs text-blue-600 font-medium">Entrada</p><p id="ja-modal-in" class="font-bold text-blue-900">--:--</p></div>
+        <div><p class="text-xs text-blue-600 font-medium">Saída</p><p id="ja-modal-out" class="font-bold text-blue-900">--:--</p></div>
+        <div><p class="text-xs text-blue-600 font-medium">Trabalhado</p><p id="ja-modal-worked" class="font-bold text-blue-900">--:--</p></div>
       </div>
-      <div class="text-right pl-4 border-l border-blue-200">
-        <p class="text-xs text-blue-600 font-medium">Banco Global Atual</p>
-        <p id="ja-modal-user-global-balance" class="text-base font-bold text-blue-900">--:--</p>
-      </div>
+    </div>
+    <div class="p-3 bg-blue-50 rounded border border-blue-200 flex justify-between items-center">
+      <p class="font-medium text-blue-900">Banco de horas atual:</p>
+      <p id="ja-modal-user-global-balance" class="text-base font-bold text-blue-900">--:--</p>
     </div>
     <div id="ja-modal-existing-req" class="hidden bg-yellow-50 p-3 rounded border border-yellow-200">
       <p class="font-semibold text-yellow-800 mb-1">Solicitação do funcionário:</p>
@@ -548,7 +511,7 @@ label:has(input[name="access_type"]:checked) { border-color: #10B981; background
       <p><strong>Data de Referência:</strong> <span id="req-modal-date" class="font-medium"></span></p>
     </div>
     <div class="p-3 bg-blue-50 rounded border border-blue-200 flex justify-between items-center">
-      <p class="font-medium text-blue-900">Banco Global Atual do Funcionário:</p>
+      <p class="font-medium text-blue-900">Banco de horas atual do funcionário:</p>
       <p id="req-modal-user-global-balance" class="text-base font-bold text-blue-900">--:--</p>
     </div>
     <div><p class="font-medium text-gray-700 mb-1">Motivo / Justificativa do Funcionário:</p><p id="req-modal-text" class="p-3 bg-gray-50 border rounded-md text-gray-800"></p></div>
@@ -581,7 +544,7 @@ label:has(input[name="access_type"]:checked) { border-color: #10B981; background
         <p class="text-sm font-semibold text-gray-700">Como tratar este dia?</p>
         <label class="flex items-start gap-2 text-sm cursor-pointer"><input type="radio" name="req_kind" value="abono" checked class="mt-1"><span><strong>Justificativa / abono</strong> – o dia é abonado pela chefia (não consome seu saldo)</span></label>
         <label class="flex items-start gap-2 text-sm cursor-pointer"><input type="radio" name="req_kind" value="banco" class="mt-1"><span><strong>Usar meu banco de horas</strong> – o déficit sai do meu saldo <span id="req-bank-hint" class="text-xs text-gray-500"></span></span></label>
-        <label class="flex items-start gap-2 text-sm cursor-pointer"><input type="radio" name="req_kind" value="compensacao" class="mt-1"><span><strong>Compensar depois</strong> – vou repor as horas em outros dias (não consome saldo automaticamente)</span></label>
+        <label class="flex items-start gap-2 text-sm cursor-pointer"><input type="radio" name="req_kind" value="compensacao" class="mt-1"><span><strong>Compensar depois</strong> – vou repor as horas em outros dias (o déficit fica como débito até a reposição)</span></label>
         <div id="req-compensate-box" class="hidden ml-6"><label class="text-xs text-gray-600">Compensar até:</label> <input type="date" id="request-compensate-until" class="p-1 border rounded-md"></div>
       </div>
       <div class="mb-4 p-3 bg-gray-50 border rounded-md">
@@ -608,7 +571,14 @@ label:has(input[name="access_type"]:checked) { border-color: #10B981; background
 
 <div id="grand-total-details-modal" class="modal"><div class="modal-content large">
   <span id="close-grand-total-details-modal" class="xbtn">&times;</span>
-  <h3 class="text-lg font-bold mb-4 border-b pb-2">Detalhes do Saldo Total (Geral)</h3>
+  <h3 class="text-lg font-bold mb-4 border-b pb-2">Detalhes do Banco de Horas</h3>
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
+    <div class="p-2 bg-green-50 rounded"><p class="text-gray-500">Ganho</p><p id="gt-earned" class="font-bold text-green-700"></p></div>
+    <div class="p-2 bg-indigo-50 rounded"><p class="text-gray-500">Consumido</p><p id="gt-consumed" class="font-bold text-indigo-700"></p></div>
+    <div class="p-2 bg-red-50 rounded"><p class="text-gray-500">Débitos</p><p id="gt-debt" class="font-bold text-red-700"></p></div>
+    <div class="p-2 bg-gray-50 rounded"><p class="text-gray-500">Saldo</p><p id="gt-total" class="font-bold"></p></div>
+  </div>
+  <p id="gt-start" class="text-xs text-gray-500 mt-2"></p>
   <div class="max-h-96 overflow-y-auto mt-4">
     <table class="min-w-full divide-y divide-gray-200 text-sm">
       <thead class="bg-gray-50 sticky top-0 shadow-sm"><tr>
@@ -657,7 +627,7 @@ const hhmm = ts => ts.toDate().toLocaleTimeString('pt-BR', { hour: '2-digit', mi
 const timeToMin = v => { if (!v) return null; const [h, m] = v.split(':').map(Number); return h * 60 + m; };
 const minToTime = m => `${pad(Math.floor(m / 60))}:${pad(m % 60)}`;
 const groupBy = (arr, fn) => arr.reduce((a, x) => { (a[fn(x)] ||= []).push(x); return a; }, {});
-const nowStamp = () => Timestamp.fromDate(new Date(new Date().setSeconds(0, 0)));
+const nowStamp = () => Timestamp.fromDate(new Date(new Date().setSeconds(0, 0))); // batida sem segundos
 const safeDays = n => n === 1 ? '1 dia' : `${n} dias`;
 
 function fmtMs(ms, showSign = false) {
@@ -675,7 +645,7 @@ function refMonthOf(date) { const x = new Date(date.getFullYear(), date.getMonth
 function formatRef(ym) { const [y, m] = ym.split('-').map(Number); const s = new Date(y, m - 1, 1).toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' }); return s.charAt(0).toUpperCase() + s.slice(1); }
 
 /* ---------- Fechamentos ---------- */
-let closures = {};
+let closures = {}; // chave: `${userId}_${YYYY-MM}`
 const isDateClosed = (userId, date) => !!closures[`${userId}_${refMonthOf(date)}`];
 const warnIfClosed = (userId, date) => isDateClosed(userId, date) &&
   !confirm('Este dia pertence a um período FECHADO. O ideal é reabrir o período antes de alterar. Continuar mesmo assim?');
@@ -687,68 +657,33 @@ const KIND_CHIP = { abono: 'text-green-600 bg-green-100 border border-green-200'
 
 function applyRequestToDay(workedMs, req) {
   const k = kindOf(req);
-  if (k === 'abono') {
-    const a = (req.abonoMinutes || 0) * 60000;
-    return { ms: a > 0 ? workedMs + a - WORKDAY_MS : 0, label: KIND_LABEL.abono };
-  }
-  if (k === 'banco') {
-    return { ms: workedMs - WORKDAY_MS, label: KIND_LABEL.banco };
-  }
-  return { ms: workedMs - WORKDAY_MS, label: KIND_LABEL.compensacao };
+  if (k === 'abono') { const a = (req.abonoMinutes || 0) * 60000; return { ms: a > 0 ? workedMs + a - WORKDAY_MS : 0, label: KIND_LABEL.abono }; }
+  return { ms: workedMs - WORKDAY_MS, label: KIND_LABEL[k] };
 }
 
-/* ---------- Cálculo único do dia ---------- */
+/* ---------- Cálculo único do dia (usado em relatório, histórico e saldo geral) ---------- */
 function evalDay(date, entries, reqs, todayS) {
   const sorted = [...entries].sort((a, b) => a.timestamp.toMillis() - b.timestamp.toMillis());
   const ins = sorted.filter(e => e.type === 'in'), outs = sorted.filter(e => e.type === 'out');
   let worked = 0;
   for (let j = 0; j < Math.min(ins.length, outs.length); j++) worked += outs[j].timestamp.toMillis() - ins[j].timestamp.toMillis();
-  
   const approved = reqs.find(r => r.status === 'approved');
-  const pending = reqs.find(r => r.status === 'pending');
-  const declined = reqs.find(r => r.status === 'declined');
-  const activeReq = approved || pending || declined || null;
-  
-  const r = { ins, outs, worked, balance: 0, state: '', label: '', req: activeReq, approved };
+  const other = reqs.find(r => r.status === 'pending') || reqs.find(r => r.status === 'declined');
+  const r = { ins, outs, worked, balance: 0, state: '', label: '', req: approved || other || null, approved };
   const dow = date.getDay(), weekend = dow === 0 || dow === 6;
   const isToday = date.getTime() === todayS.getTime();
-
-  if (date > todayS) {
-    r.state = 'future';
-    if (activeReq) r.label = KIND_LABEL[kindOf(activeReq)];
-    return r;
-  }
-  
-  if (approved) {
-    const a = applyRequestToDay(worked, approved);
-    r.balance = a.ms;
-    r.label = a.label;
-    r.state = 'approved';
-    return r;
-  }
-
-  // Se há pendência de banco, já provisiona o déficit no cálculo até decisão
-  if (pending && kindOf(pending) === 'banco') {
-    r.balance = worked - WORKDAY_MS;
-    r.label = KIND_LABEL.banco;
-    r.state = 'pending';
-    return r;
-  }
-
+  if (date > todayS) { r.state = 'future'; if (approved) r.label = KIND_LABEL[kindOf(approved)]; return r; }
+  if (approved) { const a = applyRequestToDay(worked, approved); r.balance = a.ms; r.label = a.label; r.state = 'approved'; return r; }
+  const pb = reqs.find(x => x.status === 'pending' && kindOf(x) === 'banco');
+  if (pb && !weekend) { r.balance = worked - WORKDAY_MS; r.label = KIND_LABEL.banco; r.state = 'pending'; r.req = pb; return r; }
   if (weekend) { r.state = 'weekend'; return r; }
-  
   if (ins.length > 0 && ins.length === outs.length) {
     const diff = worked - WORKDAY_MS;
-    r.balance = Math.abs(diff) <= TOLERANCE_MS ? 0 : diff;
-    r.state = 'ok';
-    return r;
+    r.balance = Math.abs(diff) <= TOLERANCE_MS ? 0 : diff; r.state = 'ok'; return r;
   }
   if (ins.length > outs.length) { r.state = isToday ? 'inprogress' : 'odd'; return r; }
   if (isToday) { r.state = 'today'; return r; }
-  
-  r.state = 'absent';
-  r.balance = -WORKDAY_MS;
-  return r;
+  r.state = 'absent'; r.balance = -WORKDAY_MS; return r;
 }
 
 function workdaysBetween(sISO, eISO) {
@@ -789,7 +724,6 @@ let requestToAction = null, motiveToEdit = null, userToEdit = null, justifyActio
 let reportCtx = null, reportRows = [], reportMeta = null, lastReport = null;
 let allUserEntries = [], allUserRequestsData = [], currentRequestDate = null;
 let grandTotalDetailsList = [], currentGrandTotalMs = 0, motivesStarted = false;
-let userBankMetadata = {}; // Armazena validade e prazos do banco por ID de usuário
 
 /* ============================ MOTIVOS ============================ */
 function listenToMotives() {
@@ -932,23 +866,20 @@ function listenToFirebaseAdmin(role, team) {
     const rf = $('request-user-filter').value;
     $('request-user-filter').innerHTML = '<option value="">Todos os Funcionários</option>' + filteredEmployees.map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join('');
     $('request-user-filter').value = rf;
-    renderUsersManagement(); renderRequests(); renderBell(); renderBankManagementTable();
+    renderUsersManagement(); renderRequests(); renderBell(); scheduleBankRender();
   });
   unsubAdmin.requests = onSnapshot(query(collection(db, `artifacts/${appId}/requests`), orderBy('createdAt', 'desc')), (snap) => {
     allAdminRequests = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    renderRequests(); renderBell(); renderBankManagementTable();
+    renderRequests(); renderBell(); scheduleBankRender();
   });
   unsubAdmin.closures = onSnapshot(collection(db, `artifacts/${appId}/closures`), (snap) => {
     closures = {}; snap.docs.forEach(d => closures[d.id] = { id: d.id, ...d.data() });
     updateCloseButtons();
   });
-  
-  // Listener para metadados de banco de horas (validade e prazos)
-  onSnapshot(collection(db, `artifacts/${appId}/bank_metadata`), (snap) => {
-    userBankMetadata = {};
-    snap.docs.forEach(d => userBankMetadata[d.id] = d.data());
-    renderBankManagementTable();
-  });
+  unsubAdmin.meta = onSnapshot(collection(db, `artifacts/${appId}/bank_metadata`), (snap) => {
+    userBankMetadata = {}; snap.docs.forEach(d => userBankMetadata[d.id] = d.data());
+    scheduleBankRender();
+  }, () => {});
 }
 
 function renderBell() {
@@ -1115,6 +1046,7 @@ async function loadAndRenderEditableHistory(userId, startDate, endDate) {
   await loadOccurrence(userId, parseInt(sm), parseInt(sy));
 }
 
+// delegação de cliques na tabela do relatório
 $('report-table-body').addEventListener('click', async (e) => {
   const b = e.target.closest('button[data-act]'); if (!b || !reportCtx) return;
   const { act, date, req } = b.dataset, uid = reportCtx.userId;
@@ -1152,10 +1084,12 @@ $('close-period-btn').addEventListener('click', async () => {
   if (lastReport.pendencias > 0 && !confirm(`Existem ${lastReport.pendencias} pendência(s) (faltas, batidas ímpares ou solicitações). Fechar mesmo assim?`)) return;
   if (!confirm(`Fechar o período ref. ${formatRef(ref)} (${start.toLocaleDateString('pt-BR')} a ${end.toLocaleDateString('pt-BR')})?`)) return;
   try {
+    const bk = await fetchUserBank(uid, true);
+    const bankSnap = { balanceMs: bk.total, earnedMs: bk.earned, consumedMs: bk.consumed, debtMs: bk.debt, countingSince: userBankMetadata[uid]?.startDate || null };
     await setDoc(doc(db, `artifacts/${appId}/closures`, `${uid}_${ref}`), {
       userId: uid, userName: allUsers.find(u => u.id === uid)?.name || '', refMonth: ref,
       startDate: toISO(start), endDate: toISO(end), balanceMs: lastReport.totalBalanceMs,
-      closedBy: auth.currentUser.email, closedAt: Timestamp.now()
+      closedBy: auth.currentUser.email, closedAt: Timestamp.now(), bank: bankSnap
     });
     refreshReport();
   } catch (e) { alert('Erro ao fechar o período (verifique as permissões).'); }
@@ -1166,16 +1100,17 @@ $('reopen-period-btn').addEventListener('click', async () => {
   try { await deleteDoc(doc(db, `artifacts/${appId}/closures`, `${uid}_${ref}`)); refreshReport(); } catch { alert('Erro ao reabrir.'); }
 });
 
-/* ---------- PDF ---------- */
+/* ---------- PDF (cabe em 1 página para períodos de até ~35 dias) ---------- */
 const toFileDate = d => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
 $('download-pdf-btn').addEventListener('click', () => {
   if (!reportMeta || !reportRows.length) return alert('Gere o relatório primeiro.');
-  if (!window.jspdf) return alert('Biblioteca de PDF não carregada.');
+  if (!window.jspdf) return alert('Biblioteca de PDF não carregada. Verifique a conexão e recarregue a página.');
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageW = pdf.internal.pageSize.getWidth(), pageH = pdf.internal.pageSize.getHeight();
   const M = 12, fmt = d => d.toLocaleDateString('pt-BR');
 
+  // Cabeçalho compacto
   pdf.setFontSize(9); pdf.setTextColor(100);
   pdf.text('Defensoria Pública do Estado do Rio de Janeiro - Coordenação de Gestão Documental', pageW / 2, 10, { align: 'center' });
   pdf.setFontSize(13); pdf.setTextColor(0);
@@ -1191,11 +1126,12 @@ $('download-pdf-btn').addEventListener('click', () => {
     pdf.setTextColor(0); startY = 36;
   }
 
+  // Espaço reservado abaixo da tabela: saldo + ocorrência + assinaturas + rodapé
   const occ = $('occurrence-details').value.trim();
   const occLines = occ ? pdf.splitTextToSize(occ, pageW - 2 * M) : [];
-  const reserve = 8 + (occLines.length ? 6 + occLines.length * 3.6 + 3 : 0) + 22 + 10;
+  const reserve = 8 + (cl && cl.bank ? 5 : 0) + (occLines.length ? 6 + occLines.length * 3.6 + 3 : 0) + 22 + 10;
   const avail = pageH - startY - reserve;
-  const rowH = avail / (reportRows.length + 1);
+  const rowH = avail / (reportRows.length + 1);                  // altura disponível por linha (mm)
   const fontSize = Math.max(5.5, Math.min(8, (rowH - 1.2) / 0.4057));
   const padV = Math.max(0.4, Math.min(2, (rowH - fontSize * 0.4057) / 2));
 
@@ -1215,10 +1151,15 @@ $('download-pdf-btn').addEventListener('click', () => {
   });
 
   let y = pdf.lastAutoTable.finalY + 6;
-  if (y > pageH - 40) { pdf.addPage(); y = 15; }
+  if (y > pageH - 40) { pdf.addPage(); y = 15; }   // só se o período for muito longo
   pdf.setFontSize(10); pdf.setTextColor(0); pdf.setFont(undefined, 'bold');
   pdf.text(`Saldo total do período: ${fmtMs(reportMeta.totalBalanceMs, true)}`, M, y);
   pdf.setFont(undefined, 'normal'); y += 6;
+  if (cl && cl.bank && cl.startDate === toISO(reportMeta.startDate)) {
+    pdf.setFontSize(8);
+    pdf.text(`Banco de horas no fechamento: saldo ${fmtMs(cl.bank.balanceMs, true)} | ganho ${fmtMs(cl.bank.earnedMs, true)} | consumido ${fmtMs(-cl.bank.consumedMs)} | débitos ${fmtMs(-cl.bank.debtMs)}`, M, y);
+    y += 5;
+  }
 
   if (occLines.length) {
     pdf.setFont(undefined, 'bold'); pdf.setFontSize(9); pdf.text('Registro de Ocorrência:', M, y); pdf.setFont(undefined, 'normal');
@@ -1227,6 +1168,7 @@ $('download-pdf-btn').addEventListener('click', () => {
     y += 3;
   }
 
+  // Assinaturas fixas no fim da página
   const sigY = Math.max(y + 12, pageH - 22);
   if (sigY > pageH - 12) { pdf.addPage(); y = 30; }
   const sy = sigY > pageH - 12 ? 30 : sigY;
@@ -1285,239 +1227,186 @@ $('apply-quick-entry-btn').addEventListener('click', async () => {
   finally { btn.disabled = false; btn.textContent = 'Aplicar'; }
 });
 
-/* ============================ CÁLCULO DE SALDO GLOBAL EXTERNO ============================ */
-async function fetchUserGlobalBalance(userId) {
-  let entries = [], reqs = [];
-  try {
-    const s1 = await getDocs(query(collection(db, 'artifacts', appId, 'users', userId, 'time_entries'), orderBy('timestamp', 'asc')));
-    entries = s1.docs.map(d => d.data());
-  } catch {}
-  try {
-    const s2 = await getDocs(query(collection(db, `artifacts/${appId}/requests`), where('userId', '==', userId)));
-    reqs = s2.docs.map(d => d.data());
-  } catch {}
-  
+/* ============================ BANCO DE HORAS ============================ */
+const CAT_INFO = { earned: ['Ganho', 'text-green-700 bg-green-100'], consumed: ['Consumido', 'text-indigo-700 bg-indigo-100'], debt: ['Débito', 'text-red-700 bg-red-100'] };
+const catChip = c => (c && CAT_INFO[c]) ? `<span class="text-[10px] font-semibold px-1.5 py-0.5 rounded ${CAT_INFO[c][1]}">${CAT_INFO[c][0]}</span>` : '';
+
+function bankCategory(ev) {
+  const b = ev.balance, rq = ev.approved || ev.req, k = rq ? kindOf(rq) : null;
+  if ((ev.state === 'approved' || ev.state === 'pending') && k === 'banco') return b < 0 ? 'consumed' : 'earned';
+  return b > 0 ? 'earned' : 'debt';
+}
+function bankReason(ev) {
+  if (ev.state === 'approved') return `${ev.label} (${ev.req.text})`;
+  if (ev.state === 'pending') return `[Pendente] ${KIND_LABEL.banco} (${ev.req.text})`;
+  if (ev.state === 'absent') return 'Falta / Ausência não justificada';
+  return ev.balance > 0 ? 'Horas Extras' : 'Débito de Horas';
+}
+
+// Calcula ganho / consumido / débitos / saldo. Só conta a partir de startISO (se definido).
+function computeBank({ entries, reqs, adjs, startISO }) {
   const todayS = startOfToday();
   const byDate = groupBy(entries, e => e.timestamp.toDate().toLocaleDateString('pt-BR'));
   const reqsBy = groupBy(reqs, r => r.date);
-  let first = null;
-  entries.forEach(e => { const d = e.timestamp.toDate(); d.setHours(0,0,0,0); if(!first || d < first) first = d; });
-  reqs.filter(r => r.status === 'approved' || (r.status === 'pending' && kindOf(r) === 'banco')).forEach(r => { const d = brToDate(r.date); if(!first || d < first) first = d; });
-  
-  let total = 0;
+  let first = startISO ? isoToDate(startISO) : null;
+  if (!startISO) {
+    entries.forEach(e => { const d = e.timestamp.toDate(); d.setHours(0, 0, 0, 0); if (!first || d < first) first = d; });
+    reqs.filter(r => r.status === 'approved' || (r.status === 'pending' && kindOf(r) === 'banco')).forEach(r => { const d = brToDate(r.date); if (!first || d < first) first = d; });
+  }
+  const items = []; let earned = 0, consumed = 0, debt = 0;
   if (first) {
-    for(let d = new Date(first); d <= todayS; d.setDate(d.getDate() + 1)) {
-      const date = new Date(d), ds = date.toLocaleDateString('pt-BR');
-      const ev = evalDay(date, byDate[ds] || [], reqsBy[ds] || [], todayS);
-      total += ev.balance;
-    }
-  }
-  return total;
-}
-
-/* ============================ ADMIN: BANCO DE HORAS GESTÃO ============================ */
-let currentBankUserId = null;
-
-async function renderBankManagementTable() {
-  const body = $('bank-management-table-body');
-  if (!body) return;
-  body.innerHTML = '';
-  
-  const statusFilter = $('bank-status-filter').value;
-  const searchTerm = ($('bank-search-input')?.value || '').toLowerCase();
-  
-  // GARANTIR FILTRAGEM DE USUÁRIOS ÚNICOS (Evitar duplicatas)
-  const uniqueUsersMap = new Map();
-  filteredEmployees.forEach(u => uniqueUsersMap.set(u.id, u));
-  const uniqueEmployees = Array.from(uniqueUsersMap.values());
-
-  const rows = uniqueEmployees.filter(u => {
-    const st = u.status || 'active';
-    if (statusFilter !== 'all' && st !== statusFilter) return false;
-    if (searchTerm && !(u.name || '').toLowerCase().includes(searchTerm) && !(u.email || '').toLowerCase().includes(searchTerm)) return false;
-    return true;
-  });
-
-  if (!rows.length) {
-    body.innerHTML = '<tr><td colspan="6" class="px-6 py-4 text-center text-gray-500">Nenhum funcionário encontrado.</td></tr>';
-    return;
-  }
-
-  for (const u of rows) {
-    const totalMs = await fetchUserGlobalBalance(u.id);
-    const meta = userBankMetadata[u.id] || {};
-    const valid = meta.validity ? isoToBR(meta.validity) : '---';
-    const dead = meta.deadline ? isoToBR(meta.deadline) : '---';
-    const badge = (u.status || 'active') === 'active' ? '<span class="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">Ativo</span>' : '<span class="px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full">Inativo</span>';
-
-    const tr = document.createElement('tr');
-    tr.className = 'hover:bg-gray-50 border-b';
-    tr.innerHTML = `
-      <td class="px-6 py-4 font-medium text-gray-800">${esc(u.name)}</td>
-      <td class="px-6 py-4 text-gray-600 text-sm">${esc(u.email || '---')}</td>
-      <td class="px-6 py-4">${badge}</td>
-      <td class="px-6 py-4 font-bold ${balClass(totalMs)}">${fmtMs(totalMs, true)}</td>
-      <td class="px-6 py-4 text-xs text-gray-600">Validade: <strong>${valid}</strong><br>Prazo Débito: <strong>${dead}</strong></td>
-      <td class="px-6 py-4"><button data-uid="${u.id}" class="open-bank-extrato text-indigo-600 hover:text-indigo-900 font-bold bg-indigo-50 px-3 py-1 rounded text-xs">Gerar / Extrato</button></td>
-    `;
-    tr.querySelector('.open-bank-extrato').addEventListener('click', () => openBankModal(u.id, u.name, totalMs));
-    body.appendChild(tr);
-  }
-}
-
-$('bank-status-filter')?.addEventListener('change', renderBankManagementTable);
-$('bank-search-input')?.addEventListener('input', renderBankManagementTable);
-
-async function openBankModal(userId, userName, totalMs) {
-  currentBankUserId = userId;
-  $('bm-user-name').textContent = userName;
-  $('bm-user-balance').textContent = fmtMs(totalMs, true);
-  $('bm-user-balance').className = `font-bold ${balClass(totalMs)}`;
-  
-  const meta = userBankMetadata[userId] || {};
-  $('bm-validity-disp').textContent = meta.validity ? isoToBR(meta.validity) : 'Nenhuma definida';
-  $('bm-deadline-disp').textContent = meta.deadline ? isoToBR(meta.deadline) : 'Nenhum definido';
-  $('bm-set-validity').value = meta.validity || '';
-  $('bm-set-deadline').value = meta.deadline || '';
-  
-  $('bm-adj-hours').value = '';
-  $('bm-adj-reason').value = '';
-  $('bm-adj-status').textContent = '';
-
-  // Carregar Extrato detalhado
-  const body = $('bm-extract-body');
-  body.innerHTML = '<tr><td colspan="3" class="px-3 py-3 text-center text-gray-500">Carregando extrato...</td></tr>';
-  $('bank-management-modal').style.display = 'flex';
-
-  let entries = [], reqs = [], manualAdjs = [];
-  try {
-    const s1 = await getDocs(query(collection(db, 'artifacts', appId, 'users', userId, 'time_entries'), orderBy('timestamp', 'asc')));
-    entries = s1.docs.map(d => ({ ...d.data(), id: d.id }));
-  } catch {}
-  try {
-    const s2 = await getDocs(query(collection(db, `artifacts/${appId}/requests`), where('userId', '==', userId)));
-    reqs = s2.docs.map(d => ({ ...d.data(), id: d.id }));
-  } catch {}
-  try {
-    const s3 = await getDocs(query(collection(db, `artifacts/${appId}/users/${userId}/manual_adjustments`), orderBy('createdAt', 'desc')));
-    manualAdjs = s3.docs.map(d => ({ ...d.data(), id: d.id }));
-  } catch {}
-
-  const todayS = startOfToday();
-  const byDate = groupBy(entries, e => e.timestamp.toDate().toLocaleDateString('pt-BR'));
-  const reqsBy = groupBy(reqs, r => r.date);
-  let first = null;
-  entries.forEach(e => { const d = e.timestamp.toDate(); d.setHours(0,0,0,0); if(!first || d < first) first = d; });
-  reqs.filter(r => r.status === 'approved' || (r.status === 'pending' && kindOf(r) === 'banco')).forEach(r => { const d = brToDate(r.date); if(!first || d < first) first = d; });
-
-  let items = [];
-  if (first) {
-    for(let d = new Date(first); d <= todayS; d.setDate(d.getDate() + 1)) {
+    for (let d = new Date(first); d <= todayS; d.setDate(d.getDate() + 1)) {
       const date = new Date(d), ds = date.toLocaleDateString('pt-BR');
       const ev = evalDay(date, byDate[ds] || [], reqsBy[ds] || [], todayS);
       if (ev.balance === 0) continue;
-      const reason = ev.state === 'approved' ? `${ev.label} (${ev.req.text})` : ev.state === 'pending' ? `[Pendente Banco] ${ev.req.text}` : (ev.balance > 0 ? 'Horas Extras' : 'Débito de Horas');
-      items.push({ date: ds, diffMs: ev.balance, reason, timeVal: date.getTime() });
+      const cat = bankCategory(ev);
+      if (cat === 'earned') earned += ev.balance; else if (cat === 'consumed') consumed += -ev.balance; else debt += -ev.balance;
+      items.push({ date: ds, diffMs: ev.balance, reason: bankReason(ev), cat, timeVal: date.getTime() });
     }
   }
-
-  manualAdjs.forEach(m => {
-    items.push({ date: m.dateStr, diffMs: m.diffMs, reason: `[Ajuste Admin] ${m.reason}`, timeVal: m.createdAt.toMillis() });
+  (adjs || []).forEach(m => {
+    const v = m.diffMs || 0; if (!v) return;
+    if (v > 0) earned += v; else consumed += -v;
+    items.push({ date: m.dateStr, diffMs: v, reason: `[Ajuste Admin] ${m.reason}`, cat: v > 0 ? 'earned' : 'consumed', timeVal: m.createdAt?.toMillis?.() ?? 0 });
   });
+  items.sort((a, b) => b.timeVal - a.timeVal);
+  return { total: earned - consumed - debt, earned, consumed, debt, items, start: first };
+}
 
-  items.sort((a,b) => b.timeVal - a.timeVal);
+// ---- admin: dados por funcionário (com cache curto) ----
+let userBankMetadata = {}, currentBankUserId = null, bankRenderToken = 0, bankTimer = null;
+const bankCache = new Map();
+async function getBankInputs(uid, force = false) {
+  const c = bankCache.get(uid);
+  if (c && !force && Date.now() - c.t < 60000) return c;
+  let entries = [], adjs = [];
+  try { const s1 = await getDocs(query(collection(db, 'artifacts', appId, 'users', uid, 'time_entries'), orderBy('timestamp', 'asc'))); entries = s1.docs.map(d => ({ ...d.data(), id: d.id })).filter(e => e.timestamp); } catch {}
+  try { const s2 = await getDocs(collection(db, `artifacts/${appId}/users/${uid}/manual_adjustments`)); adjs = s2.docs.map(d => ({ ...d.data(), id: d.id })); } catch {}
+  const v = { t: Date.now(), entries, adjs }; bankCache.set(uid, v); return v;
+}
+async function fetchUserBank(uid, force = false) {
+  const { entries, adjs } = await getBankInputs(uid, force);
+  return computeBank({ entries, reqs: allAdminRequests.filter(r => r.userId === uid), adjs, startISO: userBankMetadata[uid]?.startDate || null });
+}
+
+function scheduleBankRender(now = false) {
+  clearTimeout(bankTimer);
+  if (!now && $('tab-panel-bank').classList.contains('hidden')) return;
+  bankTimer = setTimeout(renderBankManagementTable, now ? 0 : 400);
+}
+
+async function renderBankManagementTable() {
+  const body = $('bank-management-table-body'); if (!body) return;
+  const token = ++bankRenderToken;
+  const sf = $('bank-status-filter').value, term = ($('bank-search-input').value || '').toLowerCase();
+  const rows = filteredEmployees.filter(u => (sf === 'all' || (u.status || 'active') === sf) &&
+    (!term || (u.name || '').toLowerCase().includes(term) || (u.email || '').toLowerCase().includes(term)));
+  if (!rows.length) { body.innerHTML = '<tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">Nenhum funcionário encontrado.</td></tr>'; return; }
+  const results = await Promise.all(rows.map(async u => ({ u, b: await fetchUserBank(u.id) })));
+  if (token !== bankRenderToken) return;           // evita linhas duplicadas por renderizações concorrentes
+  const todayISO = toISO(new Date());
   body.innerHTML = '';
-  if (!items.length) {
-    body.innerHTML = '<tr><td colspan="3" class="px-3 py-3 text-center text-gray-500">Nenhum lançamento no extrato.</td></tr>';
-    return;
-  }
-
-  items.forEach(i => {
-    const tr = document.createElement('tr');
-    tr.className = 'border-b hover:bg-gray-50';
-    tr.innerHTML = `
-      <td class="px-3 py-2 font-medium text-gray-700">${i.date}</td>
-      <td class="px-3 py-2 text-gray-600">${esc(i.reason)}</td>
-      <td class="px-3 py-2 text-right font-bold ${i.diffMs > 0 ? 'text-green-600' : 'text-red-600'}">${fmtMs(i.diffMs, true)}</td>
-    `;
+  results.forEach(({ u, b }) => {
+    const meta = userBankMetadata[u.id] || {};
+    const vAlert = meta.validity && meta.validity < todayISO && b.total > 0 ? ' <span class="text-red-600 font-bold">⚠️ vencida</span>' : '';
+    const dAlert = meta.deadline && meta.deadline < todayISO && b.total < 0 ? ' <span class="text-red-600 font-bold">⚠️ vencido</span>' : '';
+    const badge = (u.status || 'active') === 'active' ? '<span class="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">Ativo</span>' : '<span class="px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full">Inativo</span>';
+    const tr = document.createElement('tr'); tr.className = 'hover:bg-gray-50 border-b';
+    tr.innerHTML = `<td class="px-6 py-4"><p class="font-medium text-gray-800">${esc(u.name)}</p><p class="text-xs text-gray-500">${esc(u.email || '---')}</p></td>
+      <td class="px-6 py-4">${badge}</td>
+      <td class="px-6 py-4 text-xs text-gray-600">Desde: <strong>${meta.startDate ? isoToBR(meta.startDate) : '1º registro'}</strong><br>Validade: <strong>${meta.validity ? isoToBR(meta.validity) : '---'}</strong>${vAlert}<br>Prazo débito: <strong>${meta.deadline ? isoToBR(meta.deadline) : '---'}</strong>${dAlert}</td>
+      <td class="px-6 py-4 font-medium text-green-600">${fmtMs(b.earned, true)}</td>
+      <td class="px-6 py-4 font-medium text-indigo-600">${fmtMs(-b.consumed)}</td>
+      <td class="px-6 py-4 font-medium text-red-600">${fmtMs(-b.debt)}</td>
+      <td class="px-6 py-4 font-bold ${balClass(b.total)}">${fmtMs(b.total, true)}</td>
+      <td class="px-6 py-4"><button class="text-indigo-600 hover:text-indigo-900 font-bold bg-indigo-50 px-3 py-1 rounded text-xs">Extrato / Gerir</button></td>`;
+    tr.querySelector('button').addEventListener('click', () => openBankModal(u.id, u.name));
     body.appendChild(tr);
   });
 }
+$('bank-status-filter').addEventListener('change', () => scheduleBankRender(true));
+$('bank-search-input').addEventListener('input', () => scheduleBankRender(true));
 
-$('close-bank-modal').addEventListener('click', () => { $('bank-management-modal').style.display = 'none'; });
-$('close-bank-modal-btn').addEventListener('click', () => { $('bank-management-modal').style.display = 'none'; });
+async function openBankModal(userId, userName) {
+  currentBankUserId = userId;
+  $('bm-user-name').textContent = userName;
+  $('bm-extract-body').innerHTML = '<tr><td colspan="3" class="px-3 py-3 text-center text-gray-500">Carregando extrato...</td></tr>';
+  $('bm-adj-status').textContent = ''; $('bm-adj-hours').value = ''; $('bm-adj-reason').value = '';
+  $('bank-management-modal').style.display = 'flex';
+  const b = await fetchUserBank(userId, true);
+  if (currentBankUserId !== userId) return;
+  const meta = userBankMetadata[userId] || {};
+  $('bm-earned').textContent = fmtMs(b.earned, true); $('bm-consumed').textContent = fmtMs(-b.consumed); $('bm-debt').textContent = fmtMs(-b.debt);
+  $('bm-user-balance').textContent = fmtMs(b.total, true); $('bm-user-balance').className = `font-bold ${balClass(b.total)}`;
+  $('bm-start-disp').textContent = meta.startDate ? isoToBR(meta.startDate) : '1º registro';
+  $('bm-validity-disp').textContent = meta.validity ? isoToBR(meta.validity) : '---';
+  $('bm-deadline-disp').textContent = meta.deadline ? isoToBR(meta.deadline) : '---';
+  $('bm-set-start').value = meta.startDate || ''; $('bm-set-validity').value = meta.validity || ''; $('bm-set-deadline').value = meta.deadline || '';
+  const body = $('bm-extract-body'); body.innerHTML = '';
+  if (!b.items.length) { body.innerHTML = '<tr><td colspan="3" class="px-3 py-3 text-center text-gray-500">Nenhum lançamento no extrato.</td></tr>'; return; }
+  b.items.forEach(i => {
+    const tr = document.createElement('tr'); tr.className = 'border-b hover:bg-gray-50';
+    tr.innerHTML = `<td class="px-3 py-2 font-medium text-gray-700">${i.date}</td><td class="px-3 py-2 text-gray-600">${catChip(i.cat)} ${esc(i.reason)}</td>
+      <td class="px-3 py-2 text-right font-bold ${i.diffMs > 0 ? 'text-green-600' : 'text-red-600'}">${fmtMs(i.diffMs, true)}</td>`;
+    body.appendChild(tr);
+  });
+}
+const closeBank = () => { $('bank-management-modal').style.display = 'none'; currentBankUserId = null; };
+$('close-bank-modal').addEventListener('click', closeBank);
+$('close-bank-modal-btn').addEventListener('click', closeBank);
 
-// Salvar Validade
-$('bm-save-validity-btn').addEventListener('click', async () => {
-  if (!currentBankUserId) return;
-  const val = $('bm-set-validity').value;
+async function saveBankMeta(field, value, okMsg) {
+  const uid = currentBankUserId; if (!uid) return;
   try {
-    await setDoc(doc(db, `artifacts/${appId}/bank_metadata`, currentBankUserId), { validity: val || null }, { merge: true });
-    alert('Validade do saldo positivo salva com sucesso!');
-    renderBankManagementTable();
-  } catch (e) { alert('Erro ao salvar validade.'); }
+    await setDoc(doc(db, `artifacts/${appId}/bank_metadata`, uid), { [field]: value || null }, { merge: true });
+    userBankMetadata[uid] = { ...(userBankMetadata[uid] || {}), [field]: value || null };
+    const name = $('bm-user-name').textContent;
+    await openBankModal(uid, name); scheduleBankRender(true);
+    if (okMsg) { const st = $('bm-adj-status'); st.textContent = okMsg; st.className = 'text-xs text-green-600 text-center font-medium'; }
+  } catch (e) { alert('Erro ao salvar (verifique as permissões do Firestore).'); }
+}
+$('bm-save-start-btn').addEventListener('click', () => {
+  if (!confirm('Alterar o início da contagem? Dias anteriores a esta data deixarão de entrar no saldo do banco.')) return;
+  saveBankMeta('startDate', $('bm-set-start').value, 'Início da contagem salvo.');
 });
-
-// Salvar Prazo Débito
-$('bm-save-deadline-btn').addEventListener('click', async () => {
-  if (!currentBankUserId) return;
-  const dead = $('bm-set-deadline').value;
-  try {
-    await setDoc(doc(db, `artifacts/${appId}/bank_metadata`, currentBankUserId), { deadline: dead || null }, { merge: true });
-    alert('Prazo limite de débito salvo com sucesso!');
-    renderBankManagementTable();
-  } catch (e) { alert('Erro ao salvar prazo.'); }
+$('bm-start-today-btn').addEventListener('click', () => {
+  if (!confirm('Contar o banco de horas somente a partir de hoje? Todo o histórico anterior deixa de entrar no saldo.')) return;
+  saveBankMeta('startDate', toISO(new Date()), 'Contagem iniciada a partir de hoje.');
 });
+$('bm-start-clear-btn').addEventListener('click', () => saveBankMeta('startDate', null, 'Contagem desde o primeiro registro.'));
+$('bm-save-validity-btn').addEventListener('click', () => saveBankMeta('validity', $('bm-set-validity').value, 'Validade salva.'));
+$('bm-save-deadline-btn').addEventListener('click', () => saveBankMeta('deadline', $('bm-set-deadline').value, 'Prazo salvo.'));
 
-// Aplicar Ajuste Manual Administrativo
 $('bm-apply-adj-btn').addEventListener('click', async () => {
-  if (!currentBankUserId) return;
-  const type = $('bm-adj-type').value;
-  const hoursStr = $('bm-adj-hours').value;
-  const reason = $('bm-adj-reason').value.trim();
-  const st = $('bm-adj-status');
-
-  if (!hoursStr) { st.textContent = 'Informe a quantidade de horas.'; st.className = 'text-xs text-red-600 text-center font-medium'; return; }
-  if (!reason) { st.textContent = 'Informe a justificativa do ajuste.'; st.className = 'text-xs text-red-600 text-center font-medium'; return; }
-
-  const mins = timeToMin(hoursStr);
-  const ms = mins * 60000 * (type === 'credit' ? 1 : -1);
-
+  const uid = currentBankUserId; if (!uid) return;
+  const st = $('bm-adj-status'), say = (t, c) => { st.textContent = t; st.className = `text-xs text-${c}-600 text-center font-medium`; };
+  const mins = timeToMin($('bm-adj-hours').value), reason = $('bm-adj-reason').value.trim();
+  if (!mins) return say('Informe a quantidade de horas.', 'red');
+  if (!reason) return say('Informe a justificativa do ajuste.', 'red');
   try {
-    await addDoc(collection(db, `artifacts/${appId}/users/${currentBankUserId}/manual_adjustments`), {
-      diffMs: ms,
-      reason,
-      dateStr: new Date().toLocaleDateString('pt-BR'),
-      createdAt: Timestamp.now(),
-      adminEmail: auth.currentUser.email
+    await addDoc(collection(db, `artifacts/${appId}/users/${uid}/manual_adjustments`), {
+      diffMs: mins * 60000 * ($('bm-adj-type').value === 'credit' ? 1 : -1), reason,
+      dateStr: new Date().toLocaleDateString('pt-BR'), createdAt: Timestamp.now(), adminEmail: auth.currentUser.email
     });
-    st.textContent = 'Ajuste aplicado com sucesso!'; st.className = 'text-xs text-green-600 text-center font-medium';
-    const newTotal = await fetchUserGlobalBalance(currentBankUserId);
-    openBankModal(currentBankUserId, $('bm-user-name').textContent, newTotal);
-    renderBankManagementTable();
-  } catch (e) {
-    st.textContent = 'Erro ao aplicar ajuste.'; st.className = 'text-xs text-red-600 text-center font-medium';
-  }
+    bankCache.delete(uid);
+    await openBankModal(uid, $('bm-user-name').textContent); scheduleBankRender(true);
+    say('Ajuste aplicado com sucesso!', 'green');
+  } catch (e) { say('Erro ao aplicar ajuste.', 'red'); }
 });
 
 /* ============================ ADMIN: MODAIS DE DIA ============================ */
-async function showJustifyActionModal(dateIso, userId) {
+function showJustifyActionModal(dateIso, userId) {
   const date = isoToDate(dateIso), ds = date.toLocaleDateString('pt-BR');
   const dayReqs = reportCtx.reqsByDate[ds] || [];
   const existing = dayReqs.find(r => r.status === 'pending') || dayReqs[0] || null;
   const ev = evalDay(date, reportCtx.entriesByDay[ds] || [], [], startOfToday());
-  
   justifyActionContext = { userId, userName: allUsers.find(u => u.id === userId)?.name || '', dateString: ds, existingRequest: existing };
   $('ja-modal-user-name').textContent = justifyActionContext.userName; $('ja-modal-date').textContent = ds;
   $('ja-modal-in').textContent = ev.ins[0] ? hhmm(ev.ins[0].timestamp) : '---';
   $('ja-modal-out').textContent = ev.outs[0] ? hhmm(ev.outs[0].timestamp) : '---';
   $('ja-modal-worked').textContent = fmtMs(ev.worked);
-
-  const globalBal = await fetchUserGlobalBalance(userId);
-  const gbEl = $('ja-modal-user-global-balance');
-  gbEl.textContent = fmtMs(globalBal, true);
-  gbEl.className = `text-base font-bold ${balClass(globalBal)}`;
-
+  $('ja-modal-user-global-balance').textContent = '...';
+  fetchUserBank(userId).then(b => { const el = $('ja-modal-user-global-balance'); el.textContent = `${fmtMs(b.total, true)} (consumido: ${fmtMs(-b.consumed)})`; el.className = `text-base font-bold ${balClass(b.total)}`; });
   const sel = $('ja-modal-reason-select'), other = $('ja-modal-reason-other');
   other.classList.add('hidden'); other.value = '';
   if (existing) {
@@ -1564,7 +1453,7 @@ $('save-ja-btn').addEventListener('click', async () => {
     if (existingRequest) await updateDoc(doc(db, `artifacts/${appId}/requests`, existingRequest.id), { status: decision, text: reason, abonoMinutes, kind, compensateUntil });
     else await addDoc(collection(db, `artifacts/${appId}/requests`), { userId, userName, date: dateString, text: reason, status: decision, createdAt: Timestamp.now(), abonoMinutes, kind, compensateUntil });
     setMsg(msg, decision === 'approved' ? 'Dia aprovado com sucesso!' : 'Solicitação recusada.', decision === 'approved' ? 'green' : 'orange');
-    setTimeout(() => { closeJa(); refreshReport(); renderBankManagementTable(); }, 900);
+    setTimeout(() => { closeJa(); refreshReport(); }, 900);
   } catch { setMsg(msg, 'Erro ao salvar.', 'red'); }
   $('save-ja-btn').disabled = false;
 });
@@ -1615,7 +1504,8 @@ $('save-add-btn').addEventListener('click', async () => {
     await Promise.all(snaps.docs.map(d => deleteDoc(d.ref)));
     await Promise.all(newEntries.map(x => addDoc(ref, x)));
     setMsg($('add-entry-message'), 'Salvo!', 'green');
-    setTimeout(() => { $('add-entry-modal').style.display = 'none'; entryToAddOrEdit = null; refreshReport(); renderBankManagementTable(); }, 800);
+    bankCache.delete(userId); scheduleBankRender();
+    setTimeout(() => { $('add-entry-modal').style.display = 'none'; entryToAddOrEdit = null; refreshReport(); }, 800);
   } catch (err) { console.log(err); setMsg($('add-entry-message'), 'Erro ao salvar.', 'red'); }
 });
 $('cancel-add-btn').addEventListener('click', () => { $('add-entry-modal').style.display = 'none'; entryToAddOrEdit = null; });
@@ -1644,12 +1534,12 @@ $('save-justify-btn').addEventListener('click', async () => {
       text: reason, status: 'approved', createdAt: Timestamp.now(), abonoMinutes: am > 0 ? am : null, kind, compensateUntil
     });
     setMsg(msg, 'Salvo!', 'green');
-    setTimeout(() => { $('justify-modal').style.display = 'none'; dayToJustify = null; refreshReport(); renderBankManagementTable(); }, 800);
+    setTimeout(() => { $('justify-modal').style.display = 'none'; dayToJustify = null; refreshReport(); }, 800);
   } catch (e) { console.log(e); setMsg(msg, 'Erro ao salvar.', 'red'); }
 });
 $('cancel-justify-btn').addEventListener('click', () => { $('justify-modal').style.display = 'none'; dayToJustify = null; });
 
-/* ---------- Excluir ---------- */
+/* ---------- Excluir (solicitação / motivo) ---------- */
 $('confirm-delete-btn').addEventListener('click', async () => {
   const b = $('confirm-delete-btn'); b.textContent = 'Aguarde...'; b.disabled = true;
   try {
@@ -1658,23 +1548,19 @@ $('confirm-delete-btn').addEventListener('click', async () => {
   } catch (e) { console.log(e); }
   requestToDelete = null; motiveToDelete = null;
   $('delete-confirm-modal').style.display = 'none'; b.textContent = 'Confirmar Ação'; b.disabled = false;
-  refreshReport(); renderBankManagementTable();
+  refreshReport();
 });
 $('cancel-delete-btn').addEventListener('click', () => { requestToDelete = null; motiveToDelete = null; $('delete-confirm-modal').style.display = 'none'; });
 
 /* ---------- Analisar solicitação ---------- */
-async function showRequestActionModal(req) {
+function showRequestActionModal(req) {
   requestToAction = req;
   $('req-modal-user-name').textContent = req.userName; $('req-modal-date').textContent = req.date;
   let text = req.text || '';
   if (req.batchId) text += `  [Período: ${isoToBR(req.batchStart)} a ${isoToBR(req.batchEnd)}]`;
   $('req-modal-text').textContent = text;
-  
-  const globalBal = await fetchUserGlobalBalance(req.userId);
-  const gbEl = $('req-modal-user-global-balance');
-  gbEl.textContent = fmtMs(globalBal, true);
-  gbEl.className = `text-base font-bold ${balClass(globalBal)}`;
-
+  $('req-modal-user-global-balance').textContent = '...';
+  fetchUserBank(req.userId).then(b => { const el = $('req-modal-user-global-balance'); el.textContent = `${fmtMs(b.total, true)} (consumido: ${fmtMs(-b.consumed)})`; el.className = `text-base font-bold ${balClass(b.total)}`; });
   const kind = kindOf(req), det = $('req-modal-requested-details'), dtxt = $('req-modal-requested-hours-text');
   det.classList.add('hidden'); $('req-modal-abono').value = '';
   $('req-modal-abono-box').classList.toggle('hidden', kind !== 'abono');
@@ -1687,7 +1573,7 @@ async function showRequestActionModal(req) {
   } else {
     det.classList.remove('hidden');
     dtxt.innerHTML = kind === 'banco' ? '🏦 <strong>Uso de banco de horas</strong> – o déficit será descontado do saldo do funcionário.'
-      : `🔁 <strong>Compensação futura</strong> – até <strong>${isoToBR(req.compensateUntil) || '(sem data)'}</strong>. Não consome o saldo de horas.`;
+      : `🔁 <strong>Compensação futura</strong> – até <strong>${isoToBR(req.compensateUntil) || '(sem data)'}</strong>. O déficit permanece no saldo até a reposição.`;
   }
   const sibs = req.batchId ? allAdminRequests.filter(r => r.batchId === req.batchId && r.status === 'pending') : [];
   const show = sibs.length > 1;
@@ -1702,11 +1588,11 @@ function currentAbono() { return kindOf(requestToAction) === 'abono' ? timeToMin
 $('approve-req-action-btn').addEventListener('click', async () => {
   if (!requestToAction) return;
   await updateDoc(doc(db, `artifacts/${appId}/requests`, requestToAction.id), { status: 'approved', abonoMinutes: currentAbono() });
-  closeReqAction(); refreshReport(); renderBankManagementTable();
+  closeReqAction(); refreshReport();
 });
 $('decline-req-action-btn').addEventListener('click', async () => {
   if (requestToAction) await updateDoc(doc(db, `artifacts/${appId}/requests`, requestToAction.id), { status: 'declined', abonoMinutes: null });
-  closeReqAction(); refreshReport(); renderBankManagementTable();
+  closeReqAction(); refreshReport();
 });
 $('delete-req-action-btn').addEventListener('click', () => {
   if (!requestToAction) return;
@@ -1721,7 +1607,7 @@ async function actOnBatch(status) {
   const pend = allAdminRequests.filter(r => r.batchId === requestToAction.batchId && r.status === 'pending');
   const batch = writeBatch(db);
   pend.forEach(r => batch.update(doc(db, `artifacts/${appId}/requests`, r.id), { status, abonoMinutes: abono }));
-  await batch.commit(); closeReqAction(); refreshReport(); renderBankManagementTable();
+  await batch.commit(); closeReqAction(); refreshReport();
 }
 $('approve-batch-btn').addEventListener('click', () => actOnBatch('approved'));
 $('decline-batch-btn').addEventListener('click', () => actOnBatch('declined'));
@@ -1734,6 +1620,7 @@ function switchTab(tab, panel) {
 }
 [['tab-reports', 'tab-panel-reports'], ['tab-requests', 'tab-panel-requests'], ['tab-bank', 'tab-panel-bank'], ['tab-users', 'tab-panel-users'], ['tab-settings', 'tab-panel-settings']]
   .forEach(([t, p]) => $(t).addEventListener('click', () => switchTab($(t), $(p))));
+$('tab-bank').addEventListener('click', () => scheduleBankRender(true));
 
 ['request-user-status-filter', 'request-user-filter', 'request-start-date-filter', 'request-end-date-filter'].forEach(id => $(id).addEventListener('change', renderRequests));
 $('request-search-filter').addEventListener('input', renderRequests);
@@ -1794,6 +1681,7 @@ function renderUsersManagement() {
 }
 
 /* ============================ ESTAGIÁRIO ============================ */
+let userAdjs = [], userBankMeta = {}, lastUserBank = null;
 function listenToFirebaseUser(user) {
   Object.values(unsubUser).forEach(u => u && u());
   unsubUser.entries = onSnapshot(query(collection(db, 'artifacts', appId, 'users', user.uid, 'time_entries'), orderBy('timestamp', 'asc')), (snap) => {
@@ -1805,28 +1693,19 @@ function listenToFirebaseUser(user) {
   unsubUser.closures = onSnapshot(query(collection(db, `artifacts/${appId}/closures`), where('userId', '==', user.uid)), (snap) => {
     closures = {}; snap.docs.forEach(d => closures[d.id] = { id: d.id, ...d.data() }); renderUserApp();
   });
+  unsubUser.adjs = onSnapshot(collection(db, `artifacts/${appId}/users/${user.uid}/manual_adjustments`), (snap) => {
+    userAdjs = snap.docs.map(d => d.data()); renderUserApp();
+  }, () => {});
+  unsubUser.meta = onSnapshot(doc(db, `artifacts/${appId}/bank_metadata`, user.uid), (snap) => {
+    userBankMeta = snap.exists() ? snap.data() : {}; renderUserApp();
+  }, () => {});
 }
 
 function calculateGrandTotalUser() {
-  const todayS = startOfToday();
-  const byDate = groupBy(allUserEntries, e => e.timestamp.toDate().toLocaleDateString('pt-BR'));
-  const reqsBy = groupBy(allUserRequestsData, r => r.date);
-  let first = null;
-  allUserEntries.forEach(e => { const d = e.timestamp.toDate(); d.setHours(0, 0, 0, 0); if (!first || d < first) first = d; });
-  allUserRequestsData.filter(r => r.status === 'approved' || (r.status === 'pending' && kindOf(r) === 'banco')).forEach(r => { const d = brToDate(r.date); if (!first || d < first) first = d; });
-  let total = 0; grandTotalDetailsList = [];
-  if (first) {
-    for (let d = new Date(first); d <= todayS; d.setDate(d.getDate() + 1)) {
-      const date = new Date(d), ds = date.toLocaleDateString('pt-BR');
-      const ev = evalDay(date, byDate[ds] || [], reqsBy[ds] || [], todayS);
-      if (ev.balance === 0) continue;
-      total += ev.balance;
-      const reason = ev.state === 'approved' ? `${ev.label} (${ev.req.text})` : ev.state === 'pending' ? `[Pendente Banco] ${ev.req.text}` : ev.state === 'absent' ? 'Falta / Ausência não justificada' : (ev.balance > 0 ? 'Horas Extras' : 'Débito de Horas');
-      grandTotalDetailsList.push({ date: ds, diffMs: ev.balance, reason });
-    }
-  }
-  currentGrandTotalMs = total;
-  const el = $('grand-total-balance'); el.textContent = fmtMs(total, true); el.className = `text-3xl font-bold ${balClass(total)}`;
+  const b = computeBank({ entries: allUserEntries, reqs: allUserRequestsData, adjs: userAdjs, startISO: userBankMeta.startDate || null });
+  lastUserBank = b; grandTotalDetailsList = b.items; currentGrandTotalMs = b.total;
+  const el = $('grand-total-balance'); el.textContent = fmtMs(b.total, true); el.className = `text-3xl font-bold ${balClass(b.total)}`;
+  $('grand-total-sub').textContent = `Ganho ${fmtMs(b.earned, true)} · Consumido ${fmtMs(-b.consumed)} · Débitos ${fmtMs(-b.debt)}` + (userBankMeta.startDate ? ` · desde ${isoToBR(userBankMeta.startDate)}` : '');
 }
 
 function renderUserApp() {
@@ -1845,6 +1724,7 @@ function renderUserApp() {
 
   calculateGrandTotalUser();
 
+  // banner de fechamento
   const mine = Object.values(closures).sort((a, b) => b.refMonth.localeCompare(a.refMonth));
   const banner = $('period-closed-banner');
   if (mine.length) {
@@ -1857,6 +1737,7 @@ function renderUserApp() {
   const overdue = allUserRequestsData.some(r => kindOf(r) === 'compensacao' && r.status === 'approved' && r.compensateUntil && r.compensateUntil < t);
   $('comp-alert-banner').classList.toggle('hidden', !(overdue && currentGrandTotalMs < 0));
 
+  // seletor de período (ref.)
   const refs = new Set([refMonthOf(new Date())]);
   allUserEntries.forEach(e => refs.add(refMonthOf(e.timestamp.toDate())));
   allUserRequestsData.forEach(r => refs.add(refMonthOf(brToDate(r.date))));
@@ -1897,15 +1778,15 @@ function renderHistoryUser() {
       bText = ev.balance === 0 ? '00:00' : fmtMs(ev.balance, true); bClass = `${balClass(ev.balance)} font-bold`;
     }
     if (ev.state === 'approved') chips.push(chip(ev.label, KIND_CHIP[kindOf(ev.approved)]));
-    else if (ev.state === 'pending') chips.push(chip(`Pendente (${KIND_LABEL[kindOf(ev.req)]})`, 'text-yellow-700 bg-yellow-100 border border-yellow-300'));
+    else if (ev.state === 'pending') chips.push(chip('Pendente (Banco de horas)', 'text-yellow-700 bg-yellow-100 border border-yellow-300'));
     else if (ev.state === 'future' && ev.label) chips.push(chip(`${ev.label} (agendada)`, KIND_CHIP[kindOf(ev.req)]));
     else if (ev.state === 'inprogress') chips.push(chip('Em andamento', 'text-blue-600 bg-blue-100 border border-blue-200'));
     else if (ev.state === 'absent') chips.push(chip('Falta', 'text-red-600 bg-red-100 border border-red-200'));
     else if (ev.state === 'odd') chips.push(chip('Incompleto', 'text-orange-700 bg-orange-100 border border-orange-300'));
     else if (ev.state === 'weekend' && !ev.ins.length) { const s = `<span class="text-gray-400 italic">${date.getDay() === 0 ? 'Domingo' : 'Sábado'}</span>`; ins = [s]; outs = [s]; }
-    
     if (ev.state !== 'approved' && ev.state !== 'pending') {
-      if (reqs.some(r => r.status === 'declined')) chips.push(chip('Recusada', 'text-red-600 bg-red-100 border border-red-200'));
+      if (reqs.some(r => r.status === 'pending')) chips.push(chip('Pendente', 'text-yellow-700 bg-yellow-100 border border-yellow-300'));
+      else if (reqs.some(r => r.status === 'declined')) chips.push(chip('Recusada', 'text-red-600 bg-red-100 border border-red-200'));
     }
     const lock = isDateClosed(uid, date) ? ' 🔒' : '';
     const tr = document.createElement('tr'); tr.className = 'border-b hover:bg-gray-50';
@@ -1921,10 +1802,16 @@ function renderHistoryUser() {
 
 $('view-grand-total-details-btn').addEventListener('click', () => {
   const body = $('grand-total-details-body'); body.innerHTML = '';
+  const lb = lastUserBank;
+  if (lb) {
+    $('gt-earned').textContent = fmtMs(lb.earned, true); $('gt-consumed').textContent = fmtMs(-lb.consumed); $('gt-debt').textContent = fmtMs(-lb.debt);
+    $('gt-total').textContent = fmtMs(lb.total, true); $('gt-total').className = `font-bold ${balClass(lb.total)}`;
+    $('gt-start').textContent = userBankMeta.startDate ? `Contagem do banco iniciada em ${isoToBR(userBankMeta.startDate)}.` : 'Contagem desde o primeiro registro.';
+  }
   if (!grandTotalDetailsList.length) body.innerHTML = '<tr><td colspan="3" class="px-4 py-4 text-center text-gray-500">Nenhum detalhe encontrado.</td></tr>';
   [...grandTotalDetailsList].sort((a, b) => brToDate(b.date) - brToDate(a.date)).forEach(i => {
     const tr = document.createElement('tr'); tr.className = 'border-b hover:bg-gray-50';
-    tr.innerHTML = `<td class="px-4 py-3 font-medium text-gray-700">${i.date}</td><td class="px-4 py-3 text-gray-600">${esc(i.reason)}</td>
+    tr.innerHTML = `<td class="px-4 py-3 font-medium text-gray-700">${i.date}</td><td class="px-4 py-3 text-gray-600">${catChip(i.cat)} ${esc(i.reason)}</td>
       <td class="px-4 py-3 text-right font-bold ${i.diffMs > 0 ? 'text-green-600 bg-green-50' : 'text-red-600 bg-red-50'} rounded">${fmtMs(i.diffMs, true)}</td>`;
     body.appendChild(tr);
   });
