@@ -235,7 +235,7 @@ label:has(input[name="access_type"]:checked) { border-color: #10B981; background
         <div class="flex justify-between items-center">
           <div>
             <h2 class="text-xl font-bold">Gestão de Banco de Horas</h2>
-            <p class="text-sm text-gray-600">Acompanhe e gerencie os saldos de horas gerais de todos os colaboradores em tempo real.</p>
+            <p class="text-sm text-gray-600">Acompanhe e gerencie os saldos de horas gerais e prazos de validade ou pagamento de débitos.</p>
           </div>
           <input type="text" id="bank-search-filter" class="p-2 border rounded-md w-72" placeholder="Pesquisar funcionário...">
         </div>
@@ -245,6 +245,7 @@ label:has(input[name="access_type"]:checked) { border-color: #10B981; background
               <th class="th">Funcionário</th>
               <th class="th">E-mail</th>
               <th class="th text-center">Saldo Atual do Banco</th>
+              <th class="th text-center">Validade / Prazo Débito</th>
               <th class="th text-right">Ações</th>
             </tr></thead>
             <tbody id="bank-management-table-body" class="bg-white divide-y divide-gray-200"></tbody>
@@ -370,6 +371,24 @@ label:has(input[name="access_type"]:checked) { border-color: #10B981; background
         <p class="text-xs text-gray-500 uppercase font-bold">Saldo Atual</p>
         <p id="bm-user-balance" class="text-lg font-bold">--:--</p>
       </div>
+    </div>
+
+    <!-- Definir prazos de expiração ou quitação de débito -->
+    <div class="p-4 bg-amber-50 border border-amber-200 rounded-lg">
+      <h4 class="font-bold text-amber-900 text-sm mb-2">Definição de Prazos (Validade de Saldo / Prazo p/ Pagar Débito)</h4>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 items-end text-sm">
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Validade do Saldo Positivo:</label>
+          <input type="date" id="bm-expires-at" class="p-2 border rounded-md w-full bg-white">
+        </div>
+        <div>
+          <label class="block text-xs font-medium text-gray-700 mb-1">Prazo p/ Pagar Débito Negativo:</label>
+          <input type="date" id="bm-pay-deadline" class="p-2 border rounded-md w-full bg-white">
+        </div>
+        <button id="bm-save-deadlines-btn" class="py-2 px-4 bg-amber-600 text-white rounded-md hover:bg-amber-700 font-medium shadow-sm">Salvar Prazos</button>
+      </div>
+      <p class="text-xs text-amber-700 mt-1">Deixe em branco caso não queira definir prazo limite.</p>
+      <p id="bm-deadlines-msg" class="text-xs mt-1 text-center font-medium"></p>
     </div>
 
     <!-- Ajuste manual admin -->
@@ -949,19 +968,33 @@ document.addEventListener('click', () => $('requests-notification-popover').clas
 /* ============================ ADMIN: GESTÃO DO BANCO DE HORAS ============================ */
 async function renderBankManagementTable() {
   const body = $('bank-management-table-body'); if (!body) return;
-  body.innerHTML = '<tr><td colspan="4" class="px-6 py-6 text-center text-gray-500">Carregando saldos de banco de horas...</td></tr>';
+  body.innerHTML = '<tr><td colspan="5" class="px-6 py-6 text-center text-gray-500">Carregando saldos de banco de horas...</td></tr>';
   const term = ($('bank-search-filter').value || '').toLowerCase();
   const emps = filteredEmployees.filter(u => (u.name || '').toLowerCase().includes(term) || (u.email || '').toLowerCase().includes(term));
   
-  if (!emps.length) { body.innerHTML = '<tr><td colspan="4" class="px-6 py-4 text-center text-gray-500">Nenhum funcionário encontrado.</td></tr>'; return; }
+  if (!emps.length) { body.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">Nenhum funcionário encontrado.</td></tr>'; return; }
   
   body.innerHTML = '';
   for (const emp of emps) {
     const tot = await fetchUserGlobalBalance(emp.id);
+    
+    let deadlinesInfo = '---';
+    try {
+      const uDoc = await getDoc(doc(db, 'users', emp.id));
+      if (uDoc.exists()) {
+        const d = uDoc.data();
+        const parts = [];
+        if (tot > 0 && d.bankExpiresAt) parts.push(`Expira: ${isoToBR(d.bankExpiresAt)}`);
+        if (tot < 0 && d.bankPayDeadline) parts.push(`Prazo p/ pagar: ${isoToBR(d.bankPayDeadline)}`);
+        if (parts.length) deadlinesInfo = parts.join('<br>');
+      }
+    } catch {}
+
     const tr = document.createElement('tr'); tr.className = 'hover:bg-gray-50 border-b';
     tr.innerHTML = `<td class="px-6 py-4 font-medium text-gray-800">${esc(emp.name)}</td>
       <td class="px-6 py-4 text-gray-600 text-sm">${esc(emp.email || '---')}</td>
       <td class="px-6 py-4 text-center font-bold text-base ${tot >= 0 ? 'text-green-600' : 'text-red-600'}">${tot !== null ? fmtMs(tot, true) : '---'}</td>
+      <td class="px-6 py-4 text-center text-xs text-gray-600">${deadlinesInfo}</td>
       <td class="px-6 py-4 text-right"><button data-uid="${emp.id}" class="manage-bank-btn py-1.5 px-3 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 rounded text-sm font-semibold">Gerar / Extrato</button></td>`;
     tr.querySelector('.manage-bank-btn').addEventListener('click', () => openBankModal(emp));
     body.appendChild(tr);
@@ -975,8 +1008,18 @@ async function openBankModal(emp) {
   $('bm-user-balance').textContent = 'Calculando...';
   $('bm-user-balance').className = 'text-lg font-bold text-gray-500';
   $('bm-adj-hours').value = ''; $('bm-adj-reason').value = ''; $('bm-adj-msg').textContent = '';
+  $('bm-expires-at').value = ''; $('bm-pay-deadline').value = ''; $('bm-deadlines-msg').textContent = '';
   $('bank-manage-modal').style.display = 'flex';
   
+  try {
+    const uDoc = await getDoc(doc(db, 'users', emp.id));
+    if (uDoc.exists()) {
+      const dat = uDoc.data();
+      if (dat.bankExpiresAt) $('bm-expires-at').value = dat.bankExpiresAt;
+      if (dat.bankPayDeadline) $('bm-pay-deadline').value = dat.bankPayDeadline;
+    }
+  } catch {}
+
   const body = $('bm-details-body'); body.innerHTML = '<tr><td colspan="3" class="px-3 py-4 text-center text-gray-500">Carregando extrato...</td></tr>';
   
   try {
@@ -1024,6 +1067,25 @@ async function openBankModal(emp) {
   }
 }
 $('close-bank-modal').addEventListener('click', () => { $('bank-manage-modal').style.display = 'none'; activeBankUser = null; });
+
+$('bm-save-deadlines-btn').addEventListener('click', async () => {
+  if (!activeBankUser) return;
+  const bankExpiresAt = $('bm-expires-at').value || null;
+  const bankPayDeadline = $('bm-pay-deadline').value || null;
+  const msg = $('bm-deadlines-msg');
+  
+  $('bm-save-deadlines-btn').disabled = true;
+  msg.textContent = 'Salvando prazos...'; msg.className = 'text-xs mt-1 text-center font-medium text-blue-600';
+  try {
+    await setDoc(doc(db, 'users', activeBankUser.id), { bankExpiresAt, bankPayDeadline }, { merge: true });
+    msg.textContent = 'Prazos salvos com sucesso!'; msg.className = 'text-xs mt-1 text-center font-medium text-green-600';
+    setTimeout(() => { msg.textContent = ''; renderBankManagementTable(); }, 1200);
+  } catch (err) {
+    console.error(err);
+    msg.textContent = 'Erro ao salvar prazos.'; msg.className = 'text-xs mt-1 text-center font-medium text-red-600';
+  }
+  $('bm-save-deadlines-btn').disabled = false;
+});
 
 $('bm-save-adj-btn').addEventListener('click', async () => {
   if (!activeBankUser) return;
