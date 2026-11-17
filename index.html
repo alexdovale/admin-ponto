@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
@@ -172,6 +171,7 @@ label:has(input[name="access_type"]:checked) { border-color: #10B981; background
             <div><label class="block text-xs font-medium text-gray-700 mb-1">Data Inicial:</label><input type="date" id="report-start-date" class="p-2 border rounded-md"></div>
             <div><label class="block text-xs font-medium text-gray-700 mb-1">Data Final:</label><input type="date" id="report-end-date" class="p-2 border rounded-md"></div>
             <button id="generate-report-btn" class="py-2 px-4 rounded-md text-white bg-green-600 hover:bg-green-700 h-10 shadow-sm">Gerar Relatório</button>
+            <button id="report-adj-btn" class="py-2 px-4 rounded-md text-white bg-indigo-600 hover:bg-indigo-700 h-10 hidden shadow-sm">⚖️ Lançar Ajuste</button>
             <button id="download-pdf-btn" class="py-2 px-4 rounded-md text-white bg-blue-600 hover:bg-blue-700 h-10 hidden shadow-sm">Baixar PDF</button>
             <button id="close-period-btn" class="py-2 px-4 rounded-md text-white bg-red-600 hover:bg-red-700 h-10 hidden">🔒 Fechar período</button>
             <button id="reopen-period-btn" class="py-2 px-4 rounded-md text-white bg-orange-500 hover:bg-orange-600 h-10 hidden">🔓 Reabrir período</button>
@@ -357,6 +357,28 @@ label:has(input[name="access_type"]:checked) { border-color: #10B981; background
   </div>
 </div></div>
 
+<!-- Modal Lançar Ajuste Manual -->
+<div id="report-adj-modal" class="modal"><div class="modal-content">
+  <span id="close-report-adj-modal" class="xbtn">&times;</span>
+  <h3 class="text-lg font-bold mb-4 border-b pb-2">Lançar Ajuste Manual de Horas</h3>
+  <div class="space-y-4 text-sm">
+    <p><strong>Funcionário:</strong> <span id="ra-user-name" class="font-medium"></span></p>
+    <div><label class="block font-medium text-gray-700 mb-1">Data do Ajuste:</label>
+      <input type="date" id="ra-date" class="w-full p-2 border rounded-md"></div>
+    <div><label class="block font-medium text-gray-700 mb-1">Tipo:</label>
+      <select id="ra-type" class="w-full p-2 border rounded-md"><option value="credit">Adicionar crédito / Horas (+)</option><option value="debit">Descontar / Débito (-)</option></select></div>
+    <div><label class="block font-medium text-gray-700 mb-1">Horas a ajustar (HH:MM):</label>
+      <input type="time" id="ra-hours" class="w-full p-2 border rounded-md"></div>
+    <div><label class="block font-medium text-gray-700 mb-1">Justificativa / Motivo:</label>
+      <input type="text" id="ra-reason" class="w-full p-2 border rounded-md" placeholder="Ex: Acordo sem almoço, acerto de horas..."></div>
+  </div>
+  <p id="ra-status" class="text-sm mt-4 text-center font-medium"></p>
+  <div class="flex justify-end gap-3 mt-6 border-t pt-4">
+    <button id="cancel-ra-btn" class="py-2 px-4 rounded-md text-gray-700 bg-gray-100 hover:bg-gray-200">Cancelar</button>
+    <button id="save-ra-btn" class="py-2 px-4 rounded-md text-white bg-indigo-600 hover:bg-indigo-700 font-medium shadow-sm">Aplicar</button>
+  </div>
+</div></div>
+
 <!-- Modal de Gestão / Extrato do Banco de Horas -->
 <div id="bank-management-modal" class="modal"><div class="modal-content large">
   <span id="close-bank-modal" class="xbtn">&times;</span>
@@ -415,7 +437,7 @@ label:has(input[name="access_type"]:checked) { border-color: #10B981; background
 <!-- Analisar dia (admin, a partir do relatório) -->
 <div id="justify-action-modal" class="modal"><div class="modal-content large">
   <span id="close-justify-action-modal" class="xbtn">&times;</span>
-  <h3 class="text-lg font-bold mb-2 border-b pb-3">Analisar Justificativa do Dia</h3>
+  <h3 class="text-lg font-bold mb-2 border-b pb-3">Analisar Dia / Ocorrência</h3>
   <div class="space-y-4 mt-4 text-sm">
     <div class="flex justify-between bg-gray-50 p-3 rounded border">
       <p><strong>Funcionário:</strong> <span id="ja-modal-user-name" class="font-medium"></span></p>
@@ -434,19 +456,19 @@ label:has(input[name="access_type"]:checked) { border-color: #10B981; background
       <p id="ja-modal-user-global-balance" class="text-base font-bold text-blue-900">--:--</p>
     </div>
     <div id="ja-modal-existing-req" class="hidden bg-yellow-50 p-3 rounded border border-yellow-200">
-      <p class="font-semibold text-yellow-800 mb-1">Solicitação do funcionário:</p>
+      <p class="font-semibold text-yellow-800 mb-1">Solicitação ou Situação do dia:</p>
       <p id="ja-modal-req-text" class="text-gray-800 mt-1"></p>
       <p id="ja-modal-req-hours" class="text-indigo-700 font-bold mt-1 hidden"></p>
     </div>
     <div class="border-t pt-4 space-y-4">
-      <div>
+      <div id="ja-reason-container">
         <label class="block font-semibold text-gray-800 mb-1">Motivo / Justificativa:</label>
         <select id="ja-modal-reason-select" class="w-full px-3 py-2 border rounded-md mb-2"></select>
         <input type="text" id="ja-modal-reason-other" class="w-full px-3 py-2 border rounded-md hidden" placeholder="Digite outro motivo...">
       </div>
-      <div><label class="block font-semibold text-gray-800 mb-1">Modalidade:</label><div id="ja-kind-slot"></div></div>
+      <div id="ja-kind-container"><label class="block font-semibold text-gray-800 mb-1">Modalidade:</label><div id="ja-kind-slot"></div></div>
       <div id="ja-hours-box">
-        <label class="block font-semibold text-gray-800 mb-1">Horas a Abonar / Creditar:
+        <label id="ja-hours-box-label" class="block font-semibold text-gray-800 mb-1">Horas a Abonar / Creditar:
           <span class="text-xs font-normal text-gray-500 ml-1">(deixe em branco para abonar o dia inteiro)</span></label>
         <input type="time" id="ja-modal-hours" class="w-40 px-3 py-2 border rounded-md text-lg">
       </div>
@@ -662,27 +684,62 @@ function applyRequestToDay(workedMs, req) {
   return { ms: workedMs - WORKDAY_MS, label: KIND_LABEL[k] };
 }
 
-/* ---------- Cálculo único do dia ---------- */
+/* ---------- Cálculo único do dia (Lidando com aprovação de Horas Extras) ---------- */
 function evalDay(date, entries, reqs, todayS) {
   const sorted = [...entries].sort((a, b) => a.timestamp.toMillis() - b.timestamp.toMillis());
   const ins = sorted.filter(e => e.type === 'in'), outs = sorted.filter(e => e.type === 'out');
   let worked = 0;
   for (let j = 0; j < Math.min(ins.length, outs.length); j++) worked += outs[j].timestamp.toMillis() - ins[j].timestamp.toMillis();
-  const approved = reqs.find(r => r.status === 'approved');
-  const other = reqs.find(r => r.status === 'pending') || reqs.find(r => r.status === 'declined');
+  const approved = reqs.find(r => r.status === 'approved' && r.kind !== 'extra_hours');
+  const extraReq = reqs.find(r => r.kind === 'extra_hours');
+  const other = reqs.find(r => r.status === 'pending' && r.kind !== 'extra_hours') || reqs.find(r => r.status === 'declined' && r.kind !== 'extra_hours');
+
   const r = { ins, outs, worked, balance: 0, state: '', label: '', req: approved || other || null, approved };
   const dow = date.getDay(), weekend = dow === 0 || dow === 6;
   const isToday = date.getTime() === todayS.getTime();
+
   if (date > todayS) { r.state = 'future'; if (approved) r.label = KIND_LABEL[kindOf(approved)]; return r; }
+
+  // Dia de trabalho válido com entradas e saídas
+  if (ins.length > 0 && ins.length === outs.length) {
+    let expected = weekend ? 0 : WORKDAY_MS;
+    const diff = worked - expected;
+
+    if (diff > TOLERANCE_MS || (weekend && diff > 0)) {
+       // OVERTIME (Trabalhou a mais ou final de semana)
+       if (extraReq) {
+         if (extraReq.status === 'approved') {
+            r.balance = extraReq.abonoMinutes ? extraReq.abonoMinutes * 60000 : diff;
+            r.state = 'extra_approved'; r.label = 'Extra Aprovada';
+         } else {
+            r.balance = 0; r.state = 'extra_declined'; r.label = 'Extra Recusada';
+         }
+       } else {
+         // Horas extras aguardam aprovação explícita do administrador para ir ao banco.
+         r.balance = diff; r.state = 'extra_pending';
+       }
+       return r;
+    } else if (diff < -TOLERANCE_MS && !weekend) {
+       // DEFICIT
+       if (approved) {
+          const a = applyRequestToDay(worked, approved);
+          r.balance = a.ms; r.label = a.label; r.state = 'approved'; return r;
+       }
+       const pb = reqs.find(x => x.status === 'pending' && kindOf(x) === 'banco');
+       if (pb) { r.balance = diff; r.label = KIND_LABEL.banco; r.state = 'pending'; r.req = pb; return r; }
+       r.balance = diff; r.state = 'ok'; return r;
+    } else {
+       // Tempo exato ou dentro da tolerância
+       r.balance = 0; r.state = 'ok'; return r;
+    }
+  }
+
+  // Falhas de registro ou sem registro no dia
+  if (ins.length > outs.length) { r.state = isToday ? 'inprogress' : 'odd'; return r; }
   if (approved) { const a = applyRequestToDay(worked, approved); r.balance = a.ms; r.label = a.label; r.state = 'approved'; return r; }
   const pb = reqs.find(x => x.status === 'pending' && kindOf(x) === 'banco');
   if (pb && !weekend) { r.balance = worked - WORKDAY_MS; r.label = KIND_LABEL.banco; r.state = 'pending'; r.req = pb; return r; }
   if (weekend) { r.state = 'weekend'; return r; }
-  if (ins.length > 0 && ins.length === outs.length) {
-    const diff = worked - WORKDAY_MS;
-    r.balance = Math.abs(diff) <= TOLERANCE_MS ? 0 : diff; r.state = 'ok'; return r;
-  }
-  if (ins.length > outs.length) { r.state = isToday ? 'inprogress' : 'odd'; return r; }
   if (isToday) { r.state = 'today'; return r; }
   r.state = 'absent'; r.balance = -WORKDAY_MS; return r;
 }
@@ -845,12 +902,17 @@ $('forgot-password-form').addEventListener('submit', async (e) => {
   catch { $('modal-message').textContent = 'Erro ao enviar.'; $('modal-message').className = 'text-sm mt-4 text-center text-red-600'; }
 });
 
+const closeRa = () => { $('report-adj-modal').style.display = 'none'; };
+$('close-report-adj-modal').addEventListener('click', closeRa);
+$('cancel-ra-btn').addEventListener('click', closeRa);
+
 window.addEventListener('click', (e) => {
   const t = e.target;
   if (t === $('forgot-password-modal') || t === $('request-modal') || t === $('grand-total-details-modal') || t === $('bank-management-modal')) t.style.display = 'none';
   if (t === $('edit-motive-modal')) { t.style.display = 'none'; motiveToEdit = null; }
   if (t === $('edit-user-modal')) { t.style.display = 'none'; userToEdit = null; }
   if (t === $('justify-action-modal')) { t.style.display = 'none'; justifyActionContext = null; }
+  if (t === $('report-adj-modal')) { closeRa(); }
 });
 
 /* ============================ ADMIN: LISTENERS ============================ */
@@ -930,7 +992,7 @@ $('save-occurrence-btn').addEventListener('click', async () => {
 function clearAdminReportArea() {
   $('report-title').textContent = 'Histórico de Registros';
   $('report-table-body').innerHTML = '';
-  $('monthly-balance').classList.add('hidden'); $('download-pdf-btn').classList.add('hidden');
+  $('monthly-balance').classList.add('hidden'); $('download-pdf-btn').classList.add('hidden'); $('report-adj-btn').classList.add('hidden');
   $('occurrence-section').classList.add('hidden'); $('occurrence-details').value = ''; $('occurrence-status').textContent = '';
   $('no-report-message').classList.remove('hidden'); $('no-report-message').textContent = "Clique em 'Gerar Relatório' para visualizar.";
   lastReport = null; reportCtx = null; reportRows = []; reportMeta = null; updateCloseButtons();
@@ -959,10 +1021,10 @@ $('generate-report-btn').addEventListener('click', async () => {
 
 async function loadAndRenderEditableHistory(userId, startDate, endDate) {
   $('report-title').textContent = 'Carregando dados...'; $('report-table-body').innerHTML = '';
-  $('monthly-balance').classList.add('hidden'); $('download-pdf-btn').classList.add('hidden'); $('no-report-message').classList.add('hidden');
+  $('monthly-balance').classList.add('hidden'); $('download-pdf-btn').classList.add('hidden'); $('report-adj-btn').classList.add('hidden'); $('no-report-message').classList.add('hidden');
   const userName = allUsers.find(u => u.id === userId)?.name || '';
 
-  let entries = [], reqs = [];
+  let entries = [], reqs = [], adjs = [];
   try {
     const snap = await getDocs(query(collection(db, 'artifacts', appId, 'users', userId, 'time_entries'), orderBy('timestamp', 'asc')));
     entries = snap.docs.map(d => ({ ...d.data(), id: d.id })).filter(e => e.timestamp && e.timestamp.toDate() >= startDate && e.timestamp.toDate() <= endDate);
@@ -971,10 +1033,16 @@ async function loadAndRenderEditableHistory(userId, startDate, endDate) {
     const snap = await getDocs(query(collection(db, `artifacts/${appId}/requests`), where('userId', '==', userId)));
     reqs = snap.docs.map(d => ({ ...d.data(), id: d.id }));
   } catch (e) { console.log(e); }
+  try {
+    const snap = await getDocs(collection(db, `artifacts/${appId}/users/${userId}/manual_adjustments`));
+    adjs = snap.docs.map(d => ({ ...d.data(), id: d.id }));
+  } catch (e) { console.log(e); }
 
   $('report-title').textContent = `Relatório para ${userName} (${startDate.toLocaleDateString('pt-BR')} a ${endDate.toLocaleDateString('pt-BR')})`;
   const entriesByDay = groupBy(entries, e => e.timestamp.toDate().toLocaleDateString('pt-BR'));
   const reqsByDate = groupBy(reqs, r => r.date);
+  const adjsByDate = groupBy(adjs, a => a.dateStr || '');
+  
   const todayS = startOfToday();
   let total = 0, pendencias = 0; reportRows = [];
   const body = $('report-table-body');
@@ -984,7 +1052,19 @@ async function loadAndRenderEditableHistory(userId, startDate, endDate) {
     const ds = date.toLocaleDateString('pt-BR');
     const dow = date.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
     const dayReqs = reqsByDate[ds] || [];
+    const dayAdjs = adjsByDate[ds] || [];
+    
+    let adjBalance = 0;
+    let adjTexts = [];
+    dayAdjs.forEach(a => {
+      adjBalance += (a.diffMs || 0);
+      adjTexts.push(`${a.diffMs > 0 ? '+' : '-'}${minToTime(Math.abs(a.diffMs)/60000)} (${a.reason})`);
+    });
+
     const ev = evalDay(date, entriesByDay[ds] || [], dayReqs, todayS);
+    
+    ev.balance += adjBalance;
+
     const insT = ev.ins.map(e => hhmm(e.timestamp)), outsT = ev.outs.map(e => hhmm(e.timestamp));
     let obs = '---', obsClass = 'text-gray-500', saldo = '---', saldoClass = 'text-gray-700';
 
@@ -996,12 +1076,25 @@ async function loadAndRenderEditableHistory(userId, startDate, endDate) {
       case 'absent': obs = 'Falta'; obsClass = 'text-red-600 font-bold bg-red-50 px-2 py-1 rounded inline-block'; break;
       case 'odd': obs = 'Batida Ímpar'; obsClass = 'text-orange-600 font-bold bg-orange-50 px-2 py-1 rounded inline-block'; break;
       case 'inprogress': obs = 'Em andamento'; obsClass = 'text-blue-600'; break;
+      case 'extra_pending': obs = 'Hora Extra Pendente'; obsClass = 'text-yellow-600 font-bold'; break;
+      case 'extra_approved': obs = 'Extra Aprovada'; obsClass = 'text-green-600 font-medium'; break;
+      case 'extra_declined': obs = 'Extra Recusada'; obsClass = 'text-red-600 font-medium'; break;
       case 'today': obs = 'Hoje'; break;
     }
-    if (['approved', 'pending', 'ok', 'absent'].includes(ev.state)) {
+    
+    if (adjBalance !== 0) {
+      const aTxt = `Ajuste: ${adjTexts.join(', ')}`;
+      if (obs === '---' || obs === 'Hoje') obs = aTxt;
+      else obs += ` | ${aTxt}`;
+      obsClass = 'text-indigo-600 font-medium text-xs';
+    }
+
+    if (['approved', 'pending', 'ok', 'absent', 'extra_pending', 'extra_approved', 'extra_declined'].includes(ev.state) || adjBalance !== 0) {
       saldo = ev.balance === 0 ? '00:00' : fmtMs(ev.balance, true);
       saldoClass = ev.balance === 0 ? 'text-gray-800' : (ev.balance > 0 ? 'text-green-600 font-bold' : 'text-red-600 font-bold');
     }
+    
+    // Soma o saldo total do mês para o relatório
     total += ev.balance;
     if ((ev.state === 'absent' || ev.state === 'odd') && !ev.approved) pendencias++;
     if (dayReqs.some(r => r.status === 'pending')) pendencias++;
@@ -1011,15 +1104,21 @@ async function loadAndRenderEditableHistory(userId, startDate, endDate) {
     const hasPending = dayReqs.some(r => r.status === 'pending');
     const iso = toISO(date);
     let accept = '';
-    if (!weekendOrFuture) {
+
+    if (ev.state === 'extra_pending') {
+      accept = `<button data-act="accept-extra" data-date="${iso}" class="text-xs font-medium px-2 py-1 rounded text-yellow-700 bg-yellow-50 border border-yellow-300 shadow-sm">⏳ Analisar Extra</button>`;
+    } else if (ev.state === 'extra_approved' || ev.state === 'extra_declined') {
+      accept = `<button data-act="accept-extra" data-date="${iso}" class="text-xs font-medium px-2 py-1 rounded border border-gray-300 text-gray-600 bg-gray-50">📋 Rever Extra</button>`;
+    } else if (!weekendOrFuture) {
       if (ev.state === 'approved') accept = '<span class="text-xs text-green-600 font-medium">✅ Aceito</span>';
-      else if (anyReq) accept = `<button data-act="accept" data-date="${iso}" class="text-xs font-medium px-2 py-1 rounded border ${hasPending ? 'text-yellow-700 bg-yellow-50 border-yellow-300' : 'text-gray-600 bg-gray-50 border-gray-300'}">📋 Analisar</button>`;
-      else if (ev.state === 'absent' || ev.state === 'odd') accept = `<button data-act="accept" data-date="${iso}" class="text-xs font-medium px-2 py-1 rounded text-green-700 bg-green-50 border border-green-300">✅ Aceitar</button>`;
+      else if (anyReq) accept = `<button data-act="accept" data-date="${iso}" class="text-xs font-medium px-2 py-1 rounded border ${hasPending ? 'text-yellow-700 bg-yellow-50 border-yellow-300 shadow-sm' : 'text-gray-600 bg-gray-50 border-gray-300'}">📋 Analisar</button>`;
+      else if (ev.state === 'absent' || ev.state === 'odd') accept = `<button data-act="accept" data-date="${iso}" class="text-xs font-medium px-2 py-1 rounded text-green-700 bg-green-50 border border-green-300 shadow-sm">✅ Aceitar</button>`;
     }
-    const actions = weekendOrFuture ? '<span class="text-gray-300 text-xs">---</span>' :
+
+    const actions = weekendOrFuture && !accept ? '<span class="text-gray-300 text-xs">---</span>' :
       `<div class="flex flex-wrap gap-2 items-center">
         <button data-act="edit" data-date="${iso}" class="text-blue-600 hover:text-blue-800 font-medium text-sm">Editar</button>
-        ${anyReq ? `<button data-act="view" data-date="${iso}" data-req="${anyReq.id}" class="text-indigo-500 hover:text-indigo-700 text-lg" title="Ver pedido vinculado">&#9993;</button>`
+        ${(anyReq && anyReq.kind !== 'extra_hours') ? `<button data-act="view" data-date="${iso}" data-req="${anyReq.id}" class="text-indigo-500 hover:text-indigo-700 text-lg" title="Ver pedido vinculado">&#9993;</button>`
                  : `<button data-act="justify" data-date="${iso}" class="text-green-600 hover:text-green-800 font-medium text-sm">Justificar</button>`}
         ${accept}</div>`;
 
@@ -1037,7 +1136,7 @@ async function loadAndRenderEditableHistory(userId, startDate, endDate) {
   const mb = $('monthly-balance');
   mb.textContent = `Saldo total do período: ${fmtMs(total, true)}`;
   mb.className = `mt-4 p-4 rounded-md font-bold text-center border shadow-sm ${total >= 0 ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200'}`;
-  $('download-pdf-btn').classList.remove('hidden'); $('occurrence-section').classList.remove('hidden');
+  $('download-pdf-btn').classList.remove('hidden'); $('report-adj-btn').classList.remove('hidden'); $('occurrence-section').classList.remove('hidden');
 
   reportCtx = { userId, entriesByDay, reqsByDate, reqs };
   reportMeta = { userId, userName, startDate, endDate, totalBalanceMs: total };
@@ -1056,8 +1155,56 @@ $('report-table-body').addEventListener('click', async (e) => {
   else if (act === 'justify') showJustifyModal(date, uid);
   else if (act === 'view') { const r = reportCtx.reqs.find(x => x.id === req); if (r) showRequestActionModal(r); }
   else if (act === 'accept') showJustifyActionModal(date, uid);
+  else if (act === 'accept-extra') showExtraActionModal(date, uid);
 });
 const refreshReport = () => { if ($('report-start-date').value && $('report-end-date').value && $('user-dropdown').value) $('generate-report-btn').click(); };
+
+/* ---------- Modal de Ajuste Direto do Relatório ---------- */
+$('report-adj-btn').addEventListener('click', () => {
+  if (!reportCtx || !reportCtx.userId) return;
+  const userName = allUsers.find(u => u.id === reportCtx.userId)?.name || '';
+  $('ra-user-name').textContent = userName;
+  $('ra-date').value = $('report-start-date').value || toISO(new Date());
+  $('ra-hours').value = '';
+  $('ra-reason').value = '';
+  $('ra-status').textContent = '';
+  $('report-adj-modal').style.display = 'flex';
+});
+
+$('save-ra-btn').addEventListener('click', async () => {
+  if (!reportCtx || !reportCtx.userId) return;
+  const uid = reportCtx.userId;
+  const dateStr = isoToBR($('ra-date').value); // Converte para "DD/MM/YYYY" usado nos adjustments
+  const type = $('ra-type').value;
+  const mins = timeToMin($('ra-hours').value);
+  const reason = $('ra-reason').value.trim();
+  
+  const st = $('ra-status');
+  if (!dateStr || !mins || !reason) {
+    return setMsg(st, 'Preencha a data, as horas e a justificativa.', 'red');
+  }
+  
+  $('save-ra-btn').disabled = true;
+  try {
+    await addDoc(collection(db, `artifacts/${appId}/users/${uid}/manual_adjustments`), {
+      diffMs: mins * 60000 * (type === 'credit' ? 1 : -1), reason,
+      dateStr: dateStr, createdAt: Timestamp.now(), adminEmail: auth.currentUser.email
+    });
+    bankCache.delete(uid); // invalida o cache do banco global para recriar
+    setMsg(st, 'Ajuste aplicado com sucesso!', 'green');
+    
+    // Atualiza o relatório na tela para já mostrar o ajuste inserido na linha do dia
+    setTimeout(() => {
+      closeRa();
+      $('save-ra-btn').disabled = false;
+      refreshReport();
+    }, 1000);
+  } catch (e) {
+    setMsg(st, 'Erro ao salvar.', 'red');
+    $('save-ra-btn').disabled = false;
+  }
+});
+
 
 /* ---------- Fechar / reabrir período ---------- */
 const closeRef = $('close-ref-month');
@@ -1132,7 +1279,7 @@ $('download-pdf-btn').addEventListener('click', () => {
   const occLines = occ ? pdf.splitTextToSize(occ, pageW - 2 * M) : [];
   const reserve = 8 + (cl && cl.bank ? 5 : 0) + (occLines.length ? 6 + occLines.length * 3.6 + 3 : 0) + 22 + 10;
   const avail = pageH - startY - reserve;
-  const rowH = avail / (reportRows.length + 1);                  // altura disponível por linha (mm)
+  const rowH = avail / (reportRows.length + 1);                 // altura disponível por linha (mm)
   const fontSize = Math.max(5.5, Math.min(8, (rowH - 1.2) / 0.4057));
   const padV = Math.max(0.4, Math.min(2, (rowH - fontSize * 0.4057) / 2));
 
@@ -1243,11 +1390,14 @@ function consumedBar(i) {
 }
 
 function bankCategory(ev) {
+  if (ev.state === 'extra_pending' || ev.state === 'extra_declined') return null;
+  if (ev.state === 'extra_approved') return 'earned';
   const b = ev.balance, rq = ev.approved || ev.req, k = rq ? kindOf(rq) : null;
   if ((ev.state === 'approved' || ev.state === 'pending') && k === 'banco') return b < 0 ? 'consumed' : 'earned';
   return b > 0 ? 'earned' : 'debt';
 }
 function bankReason(ev) {
+  if (ev.state === 'extra_approved') return 'Horas Extras Aprovadas';
   if (ev.state === 'approved') return `${ev.label} (${ev.req.text})`;
   if (ev.state === 'pending') return `[Pendente] ${KIND_LABEL.banco} (${ev.req.text})`;
   if (ev.state === 'absent') return 'Falta / Ausência não justificada';
@@ -1268,8 +1418,11 @@ function computeBank({ entries, reqs, adjs, startISO }) {
     for (let d = new Date(first); d <= todayS; d.setDate(d.getDate() + 1)) {
       const date = new Date(d), ds = date.toLocaleDateString('pt-BR');
       const ev = evalDay(date, byDate[ds] || [], reqsBy[ds] || [], todayS);
-      if (ev.balance === 0) continue;
+      
       const cat = bankCategory(ev);
+      if (!cat) continue; // Pula dias sem balance oficial no banco (ex: extra pendente ou = 0)
+      if (ev.balance === 0) continue;
+      
       if (cat === 'earned') earned += ev.balance; else if (cat === 'consumed') consumed += -ev.balance; else debt += -ev.balance;
       items.push({ date: ds, diffMs: ev.balance, reason: bankReason(ev), cat, timeVal: date.getTime() });
     }
@@ -1410,20 +1563,59 @@ $('bm-apply-adj-btn').addEventListener('click', async () => {
 });
 
 /* ============================ ADMIN: MODAIS DE DIA ============================ */
-function showJustifyActionModal(dateIso, userId) {
+function showExtraActionModal(dateIso, userId) {
   const date = isoToDate(dateIso), ds = date.toLocaleDateString('pt-BR');
   const dayReqs = reportCtx.reqsByDate[ds] || [];
-  const existing = dayReqs.find(r => r.status === 'pending') || dayReqs[0] || null;
+  const existing = dayReqs.find(r => r.kind === 'extra_hours');
   const ev = evalDay(date, reportCtx.entriesByDay[ds] || [], [], startOfToday());
-  justifyActionContext = { userId, userName: allUsers.find(u => u.id === userId)?.name || '', dateString: ds, existingRequest: existing };
+
+  justifyActionContext = { userId, userName: allUsers.find(u => u.id === userId)?.name || '', dateString: ds, existingExtraReq: existing, extraMs: ev.worked - (date.getDay() === 0 || date.getDay() === 6 ? 0 : WORKDAY_MS) };
+  
   $('ja-modal-user-name').textContent = justifyActionContext.userName; $('ja-modal-date').textContent = ds;
   $('ja-modal-in').textContent = ev.ins[0] ? hhmm(ev.ins[0].timestamp) : '---';
   $('ja-modal-out').textContent = ev.outs[0] ? hhmm(ev.outs[0].timestamp) : '---';
   $('ja-modal-worked').textContent = fmtMs(ev.worked);
   $('ja-modal-user-global-balance').textContent = '...';
   fetchUserBank(userId).then(b => { const el = $('ja-modal-user-global-balance'); el.textContent = `${fmtMs(b.total, true)} (consumido: ${fmtMs(-b.consumed)})`; el.className = `text-base font-bold ${balClass(b.total)}`; });
+
+  $('ja-modal-existing-req').classList.remove('hidden');
+  $('ja-modal-req-text').innerHTML = `<strong>Aprovação de Horas Extras</strong><br>O funcionário registrou ${fmtMs(justifyActionContext.extraMs, true)} de horas extras neste dia.`;
+  $('ja-modal-req-hours').classList.add('hidden');
+
+  // Ajustes de interface para horas extras: esconder motivos e mostrar apenas caixa de horas a aceitar
+  $('ja-reason-container').classList.add('hidden');
+  $('ja-kind-container').classList.add('hidden');
+  $('ja-hours-box').classList.remove('hidden');
+  $('ja-hours-box-label').innerHTML = `Horas Extras a Aprovar: <span class="text-xs font-normal text-gray-500 ml-1">(deixe em branco para aprovar integralmente: ${fmtMs(justifyActionContext.extraMs, true)})</span>`;
+  $('ja-modal-hours').value = existing && existing.abonoMinutes ? minToTime(existing.abonoMinutes) : '';
+
+  document.querySelectorAll('input[name="ja_decision"]').forEach(r => r.checked = false);
+  if (existing) {
+     const input = document.querySelector(`input[name="ja_decision"][value="${existing.status}"]`);
+     if (input) input.checked = true;
+  }
+  paintDecision();
+  $('ja-modal-message').textContent = ''; $('justify-action-modal').style.display = 'flex';
+}
+
+function showJustifyActionModal(dateIso, userId) {
+  const date = isoToDate(dateIso), ds = date.toLocaleDateString('pt-BR');
+  const dayReqs = reportCtx.reqsByDate[ds] || [];
+  const existing = dayReqs.find(r => r.status === 'pending') || dayReqs[0] || null;
+  const ev = evalDay(date, reportCtx.entriesByDay[ds] || [], [], startOfToday());
+  
+  justifyActionContext = { userId, userName: allUsers.find(u => u.id === userId)?.name || '', dateString: ds, existingRequest: existing };
+  
+  $('ja-modal-user-name').textContent = justifyActionContext.userName; $('ja-modal-date').textContent = ds;
+  $('ja-modal-in').textContent = ev.ins[0] ? hhmm(ev.ins[0].timestamp) : '---';
+  $('ja-modal-out').textContent = ev.outs[0] ? hhmm(ev.outs[0].timestamp) : '---';
+  $('ja-modal-worked').textContent = fmtMs(ev.worked);
+  $('ja-modal-user-global-balance').textContent = '...';
+  fetchUserBank(userId).then(b => { const el = $('ja-modal-user-global-balance'); el.textContent = `${fmtMs(b.total, true)} (consumido: ${fmtMs(-b.consumed)})`; el.className = `text-base font-bold ${balClass(b.total)}`; });
+  
   const sel = $('ja-modal-reason-select'), other = $('ja-modal-reason-other');
   other.classList.add('hidden'); other.value = '';
+  
   if (existing) {
     $('ja-modal-existing-req').classList.remove('hidden');
     $('ja-modal-req-text').textContent = existing.text || '';
@@ -1436,11 +1628,17 @@ function showJustifyActionModal(dateIso, userId) {
   } else {
     $('ja-modal-existing-req').classList.add('hidden'); sel.value = ''; $('ja-modal-hours').value = ''; setKind('ja');
   }
+  
+  $('ja-reason-container').classList.remove('hidden');
+  $('ja-kind-container').classList.remove('hidden');
+  $('ja-hours-box-label').innerHTML = `Horas a Abonar / Creditar: <span class="text-xs font-normal text-gray-500 ml-1">(deixe em branco para abonar o dia inteiro)</span>`;
   $('ja-hours-box').classList.toggle('hidden', $('ja-kind').value !== 'abono');
+  
   document.querySelectorAll('input[name="ja_decision"]').forEach(r => r.checked = false);
   paintDecision();
   $('ja-modal-message').textContent = ''; $('justify-action-modal').style.display = 'flex';
 }
+
 function paintDecision() {
   const v = document.querySelector('input[name="ja_decision"]:checked')?.value;
   $('ja-approve-label').className = 'flex items-center gap-2 cursor-pointer p-2 border-2 rounded-lg flex-1 justify-center ' + (v === 'approved' ? 'border-green-500 bg-green-50' : 'border-gray-200 hover:bg-green-50');
@@ -1456,18 +1654,33 @@ $('save-ja-btn').addEventListener('click', async () => {
   const msg = $('ja-modal-message');
   const decision = document.querySelector('input[name="ja_decision"]:checked')?.value;
   if (!decision) return setMsg(msg, 'Selecione Aprovar ou Recusar.', 'red');
-  let reason = $('ja-modal-reason-select').value;
-  if (reason === 'outros') reason = $('ja-modal-reason-other').value.trim();
-  if (!reason) return setMsg(msg, 'Informe o motivo.', 'red');
-  const { kind, compensateUntil } = readKind('ja');
-  if (decision === 'approved' && kind === 'compensacao' && !compensateUntil) return setMsg(msg, 'Informe até quando será a compensação.', 'red');
-  const abonoMinutes = decision === 'approved' && kind === 'abono' ? timeToMin($('ja-modal-hours').value) : null;
+
+  const isExtra = !!justifyActionContext.existingExtraReq || justifyActionContext.extraMs !== undefined;
+  
+  let reason = 'Outros', kind = 'abono', compensateUntil = null;
+  
+  if (!isExtra) {
+     reason = $('ja-modal-reason-select').value;
+     if (reason === 'outros') reason = $('ja-modal-reason-other').value.trim();
+     if (!reason) return setMsg(msg, 'Informe o motivo.', 'red');
+     const rk = readKind('ja'); kind = rk.kind; compensateUntil = rk.compensateUntil;
+     if (decision === 'approved' && kind === 'compensacao' && !compensateUntil) return setMsg(msg, 'Informe até quando será a compensação.', 'red');
+  } else {
+     reason = 'Aprovação de Horas Extras';
+     kind = 'extra_hours';
+  }
+
+  const abonoMinutes = decision === 'approved' && (kind === 'abono' || kind === 'extra_hours') ? timeToMin($('ja-modal-hours').value) : null;
+  
   $('save-ja-btn').disabled = true;
   try {
-    const { userId, userName, dateString, existingRequest } = justifyActionContext;
-    if (existingRequest) await updateDoc(doc(db, `artifacts/${appId}/requests`, existingRequest.id), { status: decision, text: reason, abonoMinutes, kind, compensateUntil });
+    const { userId, userName, dateString, existingRequest, existingExtraReq } = justifyActionContext;
+    const targetReq = isExtra ? existingExtraReq : existingRequest;
+    
+    if (targetReq) await updateDoc(doc(db, `artifacts/${appId}/requests`, targetReq.id), { status: decision, text: reason, abonoMinutes, kind, compensateUntil });
     else await addDoc(collection(db, `artifacts/${appId}/requests`), { userId, userName, date: dateString, text: reason, status: decision, createdAt: Timestamp.now(), abonoMinutes, kind, compensateUntil });
-    setMsg(msg, decision === 'approved' ? 'Dia aprovado com sucesso!' : 'Solicitação recusada.', decision === 'approved' ? 'green' : 'orange');
+    
+    setMsg(msg, decision === 'approved' ? 'Aprovado com sucesso!' : 'Ação Recusada.', decision === 'approved' ? 'green' : 'orange');
     setTimeout(() => { closeJa(); refreshReport(); }, 900);
   } catch { setMsg(msg, 'Erro ao salvar.', 'red'); }
   $('save-ja-btn').disabled = false;
@@ -1733,7 +1946,7 @@ function renderUserApp() {
 
   const evT = evalDay(todayS, todayEntries, allUserRequestsData.filter(r => r.date === todayStr), todayS);
   $('total-worked').textContent = fmtMs(evT.worked);
-  const hasBal = (evT.state === 'ok' || evT.state === 'approved' || evT.state === 'pending') && (evT.ins.length > 0 || evT.state === 'approved' || evT.state === 'pending');
+  const hasBal = (evT.state === 'ok' || evT.state === 'approved' || evT.state === 'pending' || evT.state === 'extra_pending' || evT.state === 'extra_approved') && (evT.ins.length > 0 || evT.state === 'approved' || evT.state === 'pending');
   $('daily-balance').textContent = hasBal ? (evT.balance === 0 ? '00:00' : fmtMs(evT.balance, true)) : '---';
   $('daily-balance').className = `text-lg sm:text-xl font-bold ${hasBal ? balClass(evT.balance) : 'text-gray-800'}`;
 
@@ -1784,20 +1997,40 @@ function renderHistoryUser() {
     const ev = evalDay(date, byDate[ds] || [], reqs, todayS);
     if (ev.state === 'future' && !ev.req) return;
     if (ev.state === 'today' && !ev.req && date > todayS) return;
+    
+    // Add manual adjustments for the user history display to match correctly.
+    const dayAdjs = userAdjs.filter(a => a.dateStr === ds);
+    let adjBalance = 0;
+    let adjTexts = [];
+    dayAdjs.forEach(a => {
+      adjBalance += (a.diffMs || 0);
+      adjTexts.push(`${a.diffMs > 0 ? '+' : '-'}${minToTime(Math.abs(a.diffMs)/60000)} (${a.reason})`);
+    });
+    ev.balance += adjBalance;
+    
     periodBalance += ev.balance;
+    
     let ins = ev.ins.map(e => hhmm(e.timestamp)), outs = ev.outs.map(e => hhmm(e.timestamp));
     let bText = '---', bClass = 'text-gray-500', chips = [];
-    if (['approved', 'pending', 'ok', 'absent'].includes(ev.state)) {
+    if (['approved', 'pending', 'ok', 'absent', 'extra_pending', 'extra_approved', 'extra_declined'].includes(ev.state) || adjBalance !== 0) {
       bText = ev.balance === 0 ? '00:00' : fmtMs(ev.balance, true); bClass = `${balClass(ev.balance)} font-bold`;
     }
     if (ev.state === 'approved') chips.push(chip(ev.label, KIND_CHIP[kindOf(ev.approved)]));
     else if (ev.state === 'pending') chips.push(chip('Pendente (Banco de horas)', 'text-yellow-700 bg-yellow-100 border border-yellow-300'));
+    else if (ev.state === 'extra_approved') chips.push(chip(ev.label || 'Extra Aprovada', 'text-green-700 bg-green-100 border border-green-200'));
+    else if (ev.state === 'extra_pending') chips.push(chip('Extra Pendente', 'text-yellow-700 bg-yellow-100 border border-yellow-300'));
+    else if (ev.state === 'extra_declined') chips.push(chip('Extra Recusada', 'text-red-700 bg-red-100 border border-red-200'));
     else if (ev.state === 'future' && ev.label) chips.push(chip(`${ev.label} (agendada)`, KIND_CHIP[kindOf(ev.req)]));
     else if (ev.state === 'inprogress') chips.push(chip('Em andamento', 'text-blue-600 bg-blue-100 border border-blue-200'));
     else if (ev.state === 'absent') chips.push(chip('Falta', 'text-red-600 bg-red-100 border border-red-200'));
     else if (ev.state === 'odd') chips.push(chip('Incompleto', 'text-orange-700 bg-orange-100 border border-orange-300'));
     else if (ev.state === 'weekend' && !ev.ins.length) { const s = `<span class="text-gray-400 italic">${date.getDay() === 0 ? 'Domingo' : 'Sábado'}</span>`; ins = [s]; outs = [s]; }
-    if (ev.state !== 'approved' && ev.state !== 'pending') {
+    
+    if (adjBalance !== 0) {
+      chips.push(chip('Ajuste', 'text-indigo-600 bg-indigo-50 border border-indigo-200'));
+    }
+    
+    if (ev.state !== 'approved' && ev.state !== 'pending' && !ev.state.startsWith('extra_')) {
       if (reqs.some(r => r.status === 'pending')) chips.push(chip('Pendente', 'text-yellow-700 bg-yellow-100 border border-yellow-300'));
       else if (reqs.some(r => r.status === 'declined')) chips.push(chip('Recusada', 'text-red-600 bg-red-100 border border-red-200'));
     }
@@ -1882,7 +2115,7 @@ function openRequestModal(date) {
       const sc = r.status === 'pending' ? 'bg-yellow-100 text-yellow-800 border-yellow-200' : (r.status === 'approved' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-red-100 text-red-800 border-red-200');
       const st = r.status === 'pending' ? 'Pendente' : (r.status === 'approved' ? 'Aprovada' : 'Recusada');
       const k = kindOf(r);
-      const kt = k === 'banco' ? '🏦 Banco de horas (consome saldo)' : k === 'compensacao' ? `🔁 Compensar até ${isoToBR(r.compensateUntil)}` : 'Justificativa / abono (não consome saldo)';
+      const kt = k === 'extra_hours' ? 'Aprovação de Horas Extras' : k === 'banco' ? '🏦 Banco de horas (consome saldo)' : k === 'compensacao' ? `🔁 Compensar até ${isoToBR(r.compensateUntil)}` : 'Justificativa / abono (não consome saldo)';
       html += `<div class="p-4 bg-gray-50 border border-gray-200 rounded-lg shadow-sm"><div class="flex justify-between items-center mb-2 border-b pb-2">
         <span class="text-xs font-semibold text-gray-500">${r.createdAt.toDate().toLocaleString('pt-BR')}</span>
         <span class="text-xs font-bold px-3 py-1 rounded-full border ${sc}">${st}</span></div>
@@ -1949,4 +2182,4 @@ $('clock-out-button').addEventListener('click', () => clock('out', $('clock-out-
 </script>
 </body>
 </html>
-
+```eof
