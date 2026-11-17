@@ -962,6 +962,19 @@ window.addEventListener('click', (e) => {
 });
 
 /* ============================ ADMIN: LISTENERS ============================ */
+function updateRequestUserDropdown() {
+  const statusF = $('request-user-status-filter').value;
+  const rf = $('request-user-filter').value;
+  const usersForDropdown = filteredEmployees.filter(u => statusF === 'all' || (u.status || 'active') === statusF);
+  $('request-user-filter').innerHTML = '<option value="">Todos os Funcionários</option>' +
+    usersForDropdown.map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join('');
+  if (usersForDropdown.some(u => u.id === rf)) {
+    $('request-user-filter').value = rf;
+  } else {
+    $('request-user-filter').value = '';
+  }
+}
+
 function listenToFirebaseAdmin(role, team) {
   Object.values(unsubAdmin).forEach(u => u && u());
   unsubAdmin.users = onSnapshot(collection(db, 'users'), (snap) => {
@@ -972,9 +985,7 @@ function listenToFirebaseAdmin(role, team) {
     $('user-dropdown').innerHTML = '<option value="">Selecione um funcionário</option>' +
       filteredEmployees.filter(u => (u.status || 'active') === 'active').map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join('');
     $('user-dropdown').value = sel;
-    const rf = $('request-user-filter').value;
-    $('request-user-filter').innerHTML = '<option value="">Todos os Funcionários</option>' + filteredEmployees.map(u => `<option value="${u.id}">${esc(u.name)}</option>`).join('');
-    $('request-user-filter').value = rf;
+    updateRequestUserDropdown();
     renderUsersManagement(); renderRequests(); renderBell(); scheduleBankRender();
   });
   unsubAdmin.requests = onSnapshot(query(collection(db, `artifacts/${appId}/requests`), orderBy('createdAt', 'desc')), (snap) => {
@@ -1970,7 +1981,11 @@ function switchTab(tab, panel) {
   .forEach(([t, p]) => $(t).addEventListener('click', () => switchTab($(t), $(p))));
 $('tab-bank').addEventListener('click', () => scheduleBankRender(true));
 
-['request-user-status-filter', 'request-user-filter', 'request-start-date-filter', 'request-end-date-filter', 'request-motive-filter'].forEach(id => $(id).addEventListener('change', renderRequests));
+$('request-user-status-filter').addEventListener('change', () => {
+  updateRequestUserDropdown();
+  renderRequests();
+});
+['request-user-filter', 'request-start-date-filter', 'request-end-date-filter', 'request-motive-filter'].forEach(id => $(id).addEventListener('change', renderRequests));
 $('request-search-filter').addEventListener('input', renderRequests);
 $('request-month-filter').addEventListener('change', (e) => {
   const v = e.target.value; if (!v) return;
