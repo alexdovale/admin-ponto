@@ -227,10 +227,11 @@ label:has(input[name="access_type"]:checked) { border-color: #10B981; background
         <div class="my-4 flex flex-wrap gap-4 items-center p-4 bg-gray-50 rounded-lg border border-gray-200">
           <select id="request-user-status-filter" class="p-2 border rounded-md"><option value="active" selected>Ativos</option><option value="inactive">Inativos</option><option value="all">Todos os Status</option></select>
           <select id="request-user-filter" class="p-2 border rounded-md"></select>
+          <select id="request-motive-filter" class="p-2 border rounded-md"><option value="all">Todos os Motivos</option></select>
           <input type="month" id="request-month-filter" class="p-2 border rounded-md" title="Filtrar por mês">
           <div class="flex items-center gap-2"><span class="text-sm text-gray-500 hidden sm:inline">Período:</span>
             <input type="date" id="request-start-date-filter" class="p-2 border rounded-md"><input type="date" id="request-end-date-filter" class="p-2 border rounded-md"></div>
-          <input type="text" id="request-search-filter" class="p-2 border rounded-md flex-grow" placeholder="Pesquisar por texto...">
+          <input type="text" id="request-search-filter" class="p-2 border rounded-md flex-grow" placeholder="Pesquisar por texto ou nome...">
         </div>
         <div class="overflow-x-auto border rounded-lg">
           <table class="min-w-full divide-y divide-gray-200">
@@ -246,6 +247,9 @@ label:has(input[name="access_type"]:checked) { border-color: #10B981; background
           <h3 class="text-lg font-bold">Gestão do Banco de Horas</h3>
           <div class="flex flex-wrap gap-3 items-center">
             <select id="bank-status-filter" class="p-2 border rounded-md bg-white"><option value="active" selected>Estagiários Ativos</option><option value="inactive">Estagiários Inativos</option><option value="all">Todos os Status</option></select>
+            <select id="bank-team-filter" class="p-2 border rounded-md bg-white">
+               <option value="all">Todas as Equipes</option><option value="nupap">NUPAP</option><option value="nudof">NUDOF</option><option value="none">Sem equipe</option>
+            </select>
             <input type="text" id="bank-search-input" class="p-2 border rounded-md w-64 bg-white" placeholder="Pesquisar funcionário...">
           </div>
         </div>
@@ -267,10 +271,13 @@ label:has(input[name="access_type"]:checked) { border-color: #10B981; background
         <div class="my-4 flex flex-wrap gap-4 items-center p-4 bg-gray-50 rounded-lg border border-gray-200">
           <input type="text" id="user-search-filter" class="p-2 border rounded-md flex-grow" placeholder="Pesquisar por nome...">
           <select id="user-status-filter" class="p-2 border rounded-md"><option value="all">Todos os Status</option><option value="active" selected>Ativos</option><option value="inactive">Inativos</option></select>
+          <select id="user-team-filter" class="p-2 border rounded-md bg-white">
+             <option value="all">Todas as Equipes</option><option value="nupap">NUPAP</option><option value="nudof">NUDOF</option><option value="none">Sem equipe</option>
+          </select>
         </div>
         <div class="overflow-x-auto border rounded-lg">
           <table class="min-w-full divide-y divide-gray-200">
-            <thead class="bg-gray-50"><tr><th class="th">Nome</th><th class="th">E-mail</th><th class="th">Status</th><th class="th">Ações</th></tr></thead>
+            <thead class="bg-gray-50"><tr><th class="th">Nome</th><th class="th">E-mail</th><th class="th">Vigência (Início)</th><th class="th">Status</th><th class="th">Ações</th></tr></thead>
             <tbody id="users-management-table-body" class="bg-white divide-y divide-gray-200"></tbody>
           </table>
         </div>
@@ -853,6 +860,9 @@ function renderMotivesAdmin() {
   $('justify-reason-select').innerHTML = '<option value="">Selecione um motivo...</option>' + opts + other;
   $('ja-modal-reason-select').innerHTML = '<option value="">Selecione um motivo...</option>' + opts + other;
   $('quick-entry-type').innerHTML = '<option value="">Selecione um motivo...</option>' + opts;
+  
+  // Atualiza filtro de motivo na aba Solicitações do Admin
+  $('request-motive-filter').innerHTML = '<option value="all">Todos os Motivos</option>' + opts;
 }
 function renderMotivesUser() {
   $('request-motive-select').innerHTML = '<option value="">Selecione um motivo...</option>' +
@@ -1552,9 +1562,17 @@ function scheduleBankRender(now = false) {
 async function renderBankManagementTable() {
   const body = $('bank-management-table-body'); if (!body) return;
   const token = ++bankRenderToken;
-  const sf = $('bank-status-filter').value, term = ($('bank-search-input').value || '').toLowerCase();
-  const rows = filteredEmployees.filter(u => (sf === 'all' || (u.status || 'active') === sf) &&
-    (!term || (u.name || '').toLowerCase().includes(term) || (u.email || '').toLowerCase().includes(term)));
+  const sf = $('bank-status-filter').value, term = ($('bank-search-input').value || '').toLowerCase(), teamF = $('bank-team-filter').value;
+  const rows = filteredEmployees.filter(u => {
+    if (sf !== 'all' && (u.status || 'active') !== sf) return false;
+    if (teamF !== 'all') {
+       if (teamF === 'none' && u.team) return false;
+       if (teamF !== 'none' && u.team !== teamF) return false;
+    }
+    if (term && !(u.name || '').toLowerCase().includes(term) && !(u.email || '').toLowerCase().includes(term)) return false;
+    return true;
+  });
+  
   if (!rows.length) { body.innerHTML = '<tr><td colspan="8" class="px-6 py-4 text-center text-gray-500">Nenhum funcionário encontrado.</td></tr>'; return; }
   const results = await Promise.all(rows.map(async u => ({ u, b: await fetchUserBank(u.id) })));
   if (token !== bankRenderToken) return;
@@ -1580,6 +1598,7 @@ async function renderBankManagementTable() {
 }
 $('bank-status-filter').addEventListener('change', () => scheduleBankRender(true));
 $('bank-search-input').addEventListener('input', () => scheduleBankRender(true));
+$('bank-team-filter').addEventListener('change', () => scheduleBankRender(true));
 
 async function openBankModal(userId, userName) {
   currentBankUserId = userId;
@@ -1956,7 +1975,7 @@ function switchTab(tab, panel) {
   .forEach(([t, p]) => $(t).addEventListener('click', () => switchTab($(t), $(p))));
 $('tab-bank').addEventListener('click', () => scheduleBankRender(true));
 
-['request-user-status-filter', 'request-user-filter', 'request-start-date-filter', 'request-end-date-filter'].forEach(id => $(id).addEventListener('change', renderRequests));
+['request-user-status-filter', 'request-user-filter', 'request-start-date-filter', 'request-end-date-filter', 'request-motive-filter'].forEach(id => $(id).addEventListener('change', renderRequests));
 $('request-search-filter').addEventListener('input', renderRequests);
 $('request-month-filter').addEventListener('change', (e) => {
   const v = e.target.value; if (!v) return;
@@ -1965,10 +1984,11 @@ $('request-month-filter').addEventListener('change', (e) => {
 });
 $('user-search-filter').addEventListener('input', renderUsersManagement);
 $('user-status-filter').addEventListener('change', renderUsersManagement);
+$('user-team-filter').addEventListener('change', renderUsersManagement);
 
 function renderRequests() {
   const body = $('request-table-body'); body.innerHTML = '';
-  const statusF = $('request-user-status-filter').value, search = ($('request-search-filter').value || '').toLowerCase(), uid = $('request-user-filter').value;
+  const statusF = $('request-user-status-filter').value, search = ($('request-search-filter').value || '').toLowerCase(), uid = $('request-user-filter').value, motiveF = $('request-motive-filter').value;
   const sd = $('request-start-date-filter').value ? new Date($('request-start-date-filter').value + 'T00:00:00') : null;
   const ed = $('request-end-date-filter').value ? new Date($('request-end-date-filter').value + 'T23:59:59') : null;
   const todayISO = toISO(new Date());
@@ -1976,6 +1996,7 @@ function renderRequests() {
     const u = filteredEmployees.find(x => x.id === r.userId); if (!u) return false;
     if (statusF !== 'all' && (u.status || 'active') !== statusF) return false;
     if (uid && r.userId !== uid) return false;
+    if (motiveF !== 'all' && !(r.text || '').includes(motiveF)) return false;
     if (search && !(r.text || '').toLowerCase().includes(search) && !(r.userName || '').toLowerCase().includes(search)) return false;
     const d = brToDate(r.date);
     return !(sd && d < sd) && !(ed && d > ed);
@@ -2001,13 +2022,26 @@ function renderRequests() {
 
 function renderUsersManagement() {
   const body = $('users-management-table-body'); body.innerHTML = '';
-  const term = ($('user-search-filter').value || '').toLowerCase(), sf = $('user-status-filter').value || 'all';
-  const rows = filteredEmployees.filter(u => (u.name || '').toLowerCase().includes(term) && (sf === 'all' || (u.status || 'active') === sf));
-  if (!rows.length) { body.innerHTML = '<tr><td colspan="4" class="px-6 py-4 text-center text-gray-500">Nenhum usuário encontrado.</td></tr>'; return; }
+  const term = ($('user-search-filter').value || '').toLowerCase(), sf = $('user-status-filter').value || 'all', teamF = $('user-team-filter').value;
+  const rows = filteredEmployees.filter(u => {
+      if (term && !(u.name || '').toLowerCase().includes(term)) return false;
+      if (sf !== 'all' && (u.status || 'active') !== sf) return false;
+      if (teamF !== 'all') {
+         if (teamF === 'none' && u.team) return false;
+         if (teamF !== 'none' && u.team !== teamF) return false;
+      }
+      return true;
+  });
+  
+  if (!rows.length) { body.innerHTML = '<tr><td colspan="5" class="px-6 py-4 text-center text-gray-500">Nenhum usuário encontrado.</td></tr>'; return; }
   rows.forEach(u => {
     const badge = (u.status || 'active') === 'active' ? '<span class="px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">Ativo</span>' : '<span class="px-2 py-1 text-xs font-semibold text-red-800 bg-red-100 rounded-full">Inativo</span>';
+    const admissionStr = u.admissionDate ? isoToBR(u.admissionDate) : '<span class="text-gray-400">Não definido</span>';
     const tr = document.createElement('tr'); tr.className = 'hover:bg-gray-50 border-b';
-    tr.innerHTML = `<td class="px-6 py-4 font-medium text-gray-800">${esc(u.name)}</td><td class="px-6 py-4 text-gray-600 text-sm">${esc(u.email || '---')}</td><td class="px-6 py-4">${badge}</td>
+    tr.innerHTML = `<td class="px-6 py-4 font-medium text-gray-800">${esc(u.name)}</td>
+      <td class="px-6 py-4 text-gray-600 text-sm">${esc(u.email || '---')}</td>
+      <td class="px-6 py-4 text-gray-600 text-sm font-medium">${admissionStr}</td>
+      <td class="px-6 py-4">${badge}</td>
       <td class="px-6 py-4"><button class="text-blue-600 hover:text-blue-800 text-sm font-medium bg-blue-50 px-3 py-1 rounded">Editar</button></td>`;
     tr.querySelector('button').addEventListener('click', () => showEditUserModal(u));
     body.appendChild(tr);
