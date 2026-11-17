@@ -523,9 +523,9 @@ label:has(input[name="access_type"]:checked) { border-color: #10B981; background
     </div>
     <div><label class="block text-sm font-medium text-gray-700 mb-1">Modalidade:</label><div id="jm-kind-slot"></div></div>
     <div id="jm-hours-box">
-      <label class="block text-sm font-medium text-gray-700 mb-1">Horas a Abonar (opcional):</label>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Horas a Abonar / Creditar (opcional):</label>
       <input type="time" id="justify-hours" class="w-full px-3 py-2 border rounded-md">
-      <p class="text-xs text-gray-500 mt-1">Para abonar o dia todo sem batidas, deixe em branco ou informe a carga completa (ex: 06:00).</p>
+      <p class="text-xs text-gray-500 mt-1">Se modalidade for "Abono", deixar em branco abona o dia todo. Em outras, credita horas (ex: compensar almoço não tirado).</p>
     </div>
   </div>
   <p id="justify-message" class="text-sm mt-4 text-center"></p>
@@ -549,9 +549,9 @@ label:has(input[name="access_type"]:checked) { border-color: #10B981; background
     <div><p class="font-medium text-gray-700 mb-1">Motivo / Justificativa do Funcionário:</p><p id="req-modal-text" class="p-3 bg-gray-50 border rounded-md text-gray-800"></p></div>
     <div id="req-modal-requested-details" class="hidden bg-blue-50 p-4 rounded-md border border-blue-200 shadow-sm"><p id="req-modal-requested-hours-text" class="font-medium text-blue-800"></p></div>
     <div id="req-modal-abono-box" class="mt-6 border-t pt-4">
-      <label class="block font-bold text-gray-800 mb-1">Aprovar Abono / Horas a Creditar:</label>
+      <label class="block font-bold text-gray-800 mb-1">Aprovar Crédito de Horas / Abono Parcial:</label>
       <div class="flex items-center gap-2"><input type="time" id="req-modal-abono" class="w-40 px-3 py-2 border rounded-md text-lg">
-        <span class="text-xs text-gray-500">Deixe em branco para abonar o dia inteiro.</span></div>
+        <span class="text-xs text-gray-500">Deixe em branco para abono total (se "Justificativa") ou para não dar crédito extra.</span></div>
     </div>
   </div>
   <p id="req-modal-message" class="text-sm mt-4 text-center"></p>
@@ -689,8 +689,14 @@ const KIND_CHIP = { abono: 'text-green-600 bg-green-100 border border-green-200'
 
 function applyRequestToDay(workedMs, req) {
   const k = kindOf(req);
-  if (k === 'abono') { const a = (req.abonoMinutes || 0) * 60000; return { ms: a > 0 ? workedMs + a - WORKDAY_MS : 0, label: KIND_LABEL.abono }; }
-  return { ms: workedMs - WORKDAY_MS, label: KIND_LABEL[k] };
+  let ms = workedMs - WORKDAY_MS;
+  if (k === 'abono' && (!req.abonoMinutes && req.abonoMinutes !== 0)) {
+    return { ms: ms < 0 ? 0 : ms, label: KIND_LABEL.abono }; 
+  }
+  if (req.abonoMinutes) {
+    ms += (req.abonoMinutes * 60000);
+  }
+  return { ms, label: KIND_LABEL[k] };
 }
 
 /* ---------- Cálculo único do dia (Lidando com aprovação de Horas Extras) ---------- */
@@ -738,7 +744,13 @@ function evalDay(date, entries, reqs, todayS, admissionDateISO = null) {
        // DEFICIT
        if (approved) {
           const a = applyRequestToDay(worked, approved);
-          r.balance = a.ms; r.label = a.label; r.state = 'approved'; return r;
+          r.balance = a.ms; 
+          r.label = a.label; 
+          if (kindOf(approved) !== 'abono' && approved.abonoMinutes) {
+            r.label += ` (+${minToTime(approved.abonoMinutes)} cred.)`;
+          }
+          r.state = 'approved'; 
+          return r;
        }
        const pb = reqs.find(x => x.status === 'pending' && kindOf(x) === 'banco');
        if (pb) { r.balance = diff; r.label = KIND_LABEL.banco; r.state = 'pending'; r.req = pb; return r; }
@@ -751,7 +763,16 @@ function evalDay(date, entries, reqs, todayS, admissionDateISO = null) {
 
   // Falhas de registro ou sem registro no dia
   if (ins.length > outs.length) { r.state = isToday ? 'inprogress' : 'odd'; return r; }
-  if (approved) { const a = applyRequestToDay(worked, approved); r.balance = a.ms; r.label = a.label; r.state = 'approved'; return r; }
+  if (approved) { 
+    const a = applyRequestToDay(worked, approved); 
+    r.balance = a.ms; 
+    r.label = a.label; 
+    if (kindOf(approved) !== 'abono' && approved.abonoMinutes) {
+      r.label += ` (+${minToTime(approved.abonoMinutes)} cred.)`;
+    }
+    r.state = 'approved'; 
+    return r; 
+  }
   const pb = reqs.find(x => x.status === 'pending' && kindOf(x) === 'banco');
   if (pb && !weekend) { r.balance = worked - WORKDAY_MS; r.label = KIND_LABEL.banco; r.state = 'pending'; r.req = pb; return r; }
   if (weekend) { r.state = 'weekend'; return r; }
@@ -785,8 +806,8 @@ function setKind(p, kind = 'abono', until = '') {
   $(`${p}-until-box`).classList.toggle('hidden', kind !== 'compensacao');
 }
 bindKind('qe');
-bindKind('jm', k => $('jm-hours-box').classList.toggle('hidden', k !== 'abono'));
-bindKind('ja', k => $('ja-hours-box').classList.toggle('hidden', k !== 'abono'));
+bindKind('jm', k => { /* Não escondemos mais a caixa, crédito sempre disponível */ });
+bindKind('ja', k => { /* Não escondemos mais a caixa, crédito sempre disponível */ });
 
 /* ============================ ESTADO ============================ */
 let unsubAdmin = { users: null, requests: null, closures: null };
@@ -1696,8 +1717,8 @@ function showJustifyActionModal(dateIso, userId) {
   
   $('ja-reason-container').classList.remove('hidden');
   $('ja-kind-container').classList.remove('hidden');
-  $('ja-hours-box-label').innerHTML = `Horas a Abonar / Creditar: <span class="text-xs font-normal text-gray-500 ml-1">(deixe em branco para abonar o dia inteiro)</span>`;
-  $('ja-hours-box').classList.toggle('hidden', $('ja-kind').value !== 'abono');
+  $('ja-hours-box-label').innerHTML = `Horas a Abonar / Creditar: <span class="text-xs font-normal text-gray-500 ml-1">(opcional, reduz o débito do dia)</span>`;
+  $('ja-hours-box').classList.remove('hidden');
   
   document.querySelectorAll('input[name="ja_decision"]').forEach(r => r.checked = false);
   paintDecision();
@@ -1735,7 +1756,7 @@ $('save-ja-btn').addEventListener('click', async () => {
      kind = 'extra_hours';
   }
 
-  const abonoMinutes = decision === 'approved' && (kind === 'abono' || kind === 'extra_hours') ? timeToMin($('ja-modal-hours').value) : null;
+  const abonoMinutes = decision === 'approved' && $('ja-modal-hours').value ? timeToMin($('ja-modal-hours').value) : null;
   
   $('save-ja-btn').disabled = true;
   try {
@@ -1830,7 +1851,7 @@ $('save-justify-btn').addEventListener('click', async () => {
   if (!reason) return setMsg(msg, 'Motivo obrigatório.', 'red');
   const { kind, compensateUntil } = readKind('jm');
   if (kind === 'compensacao' && !compensateUntil) return setMsg(msg, 'Informe até quando será a compensação.', 'red');
-  const am = kind === 'abono' ? timeToMin($('justify-hours').value) : null;
+  const am = $('justify-hours').value ? timeToMin($('justify-hours').value) : null;
   try {
     await addDoc(collection(db, `artifacts/${appId}/requests`), {
       userId, userName: allUsers.find(u => u.id === userId).name, date: date.toLocaleDateString('pt-BR'),
@@ -1865,19 +1886,20 @@ function showRequestActionModal(req) {
   $('req-modal-user-global-balance').textContent = '...';
   fetchUserBank(req.userId).then(b => { const el = $('req-modal-user-global-balance'); el.textContent = `${fmtMs(b.total, true)} (consumido: ${fmtMs(-b.consumed)})`; el.className = `text-base font-bold ${balClass(b.total)}`; });
   const kind = kindOf(req), det = $('req-modal-requested-details'), dtxt = $('req-modal-requested-hours-text');
-  det.classList.add('hidden'); $('req-modal-abono').value = '';
-  $('req-modal-abono-box').classList.toggle('hidden', kind !== 'abono');
-  if (kind === 'abono') {
-    if (req.requestedAbonoMinutes) {
+    if (existing.requestedAbonoMinutes) {
       det.classList.remove('hidden');
-      dtxt.innerHTML = `⭐ <strong>Abono Solicitado:</strong> <span class="bg-blue-100 text-blue-900 px-2 py-1 rounded ml-1">${minToTime(req.requestedAbonoMinutes)}</span>`;
-      $('req-modal-abono').value = minToTime(req.requestedAbonoMinutes);
+      dtxt.innerHTML = `⭐ <strong>Abono Solicitado:</strong> <span class="bg-blue-100 text-blue-900 px-2 py-1 rounded ml-1">${minToTime(existing.requestedAbonoMinutes)}</span>`;
+      $('req-modal-abono').value = minToTime(existing.requestedAbonoMinutes);
     } else if (req.abonoMinutes) $('req-modal-abono').value = minToTime(req.abonoMinutes);
   } else {
     det.classList.remove('hidden');
     dtxt.innerHTML = kind === 'banco' ? '🏦 <strong>Uso de banco de horas</strong> – o déficit será descontado do saldo do funcionário.'
       : `🔁 <strong>Compensação futura</strong> – até <strong>${isoToBR(req.compensateUntil) || '(sem data)'}</strong>. O déficit permanece no saldo até a reposição.`;
+    if (req.abonoMinutes) $('req-modal-abono').value = minToTime(req.abonoMinutes);
   }
+  
+  $('req-modal-abono-box').classList.remove('hidden');
+
   const sibs = req.batchId ? allAdminRequests.filter(r => r.batchId === req.batchId && r.status === 'pending') : [];
   const show = sibs.length > 1;
   $('approve-batch-btn').classList.toggle('hidden', !show); $('decline-batch-btn').classList.toggle('hidden', !show);
@@ -1887,7 +1909,7 @@ function showRequestActionModal(req) {
 const closeReqAction = () => { $('request-action-modal').style.display = 'none'; };
 $('cancel-req-action-btn').addEventListener('click', () => { closeReqAction(); requestToAction = null; });
 
-function currentAbono() { return kindOf(requestToAction) === 'abono' ? timeToMin($('req-modal-abono').value) : null; }
+function currentAbono() { return $('req-modal-abono').value ? timeToMin($('req-modal-abono').value) : null; }
 $('approve-req-action-btn').addEventListener('click', async () => {
   if (!requestToAction) return;
   await updateDoc(doc(db, `artifacts/${appId}/requests`, requestToAction.id), { status: 'approved', abonoMinutes: currentAbono() });
