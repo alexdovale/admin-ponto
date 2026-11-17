@@ -201,7 +201,6 @@ label:has(input[name="access_type"]:checked) { border-color: #10B981; background
             </table>
           </div>
           <div id="monthly-balance" class="mt-4 p-4 rounded-md text-center hidden border shadow-sm">
-            <p class="text-lg font-bold mb-2 text-gray-800">Saldo Total do Período: <span id="mb-total"></span></p>
             <div class="flex flex-wrap justify-center gap-4 text-sm font-medium mb-1">
                <span class="bg-green-50 text-green-700 px-2 py-1 rounded border border-green-100">Ganho (Aprovado): <span id="mb-ganho"></span></span>
                <span class="bg-red-50 text-red-700 px-2 py-1 rounded border border-red-100">Débito / Faltas: <span id="mb-debito"></span></span>
@@ -1195,8 +1194,6 @@ async function loadAndRenderEditableHistory(userId, startDate, endDate) {
   }
 
   const mb = $('monthly-balance');
-  $('mb-total').textContent = fmtMs(totalBalance, true);
-  $('mb-total').className = totalBalance >= 0 ? 'text-green-700' : 'text-red-700';
   $('mb-ganho').textContent = fmtMs(totalGanho, true);
   $('mb-debito').textContent = fmtMs(totalDebito);
   $('mb-ajuste').textContent = fmtMs(totalAjuste, true);
@@ -1371,16 +1368,16 @@ $('download-pdf-btn').addEventListener('click', () => {
       if (data.column.index === 4) { if (t.startsWith('-')) data.cell.styles.textColor = [220, 38, 38]; else if (t.startsWith('+')) data.cell.styles.textColor = [22, 163, 74]; else if (t.includes('⏳')) data.cell.styles.textColor = [202, 138, 4]; }
       if (data.column.index === 5) { if (t === 'Falta') data.cell.styles.textColor = [220, 38, 38]; else if (t.startsWith('Fim de Semana')) data.cell.styles.textColor = [150, 150, 150]; }
       if (t === 'Fim de Semana' || data.row.raw[5] === 'Fim de Semana') data.cell.styles.fillColor = [245, 245, 245];
+      if (t === 'Falta') data.cell.styles.textColor = [220, 38, 38]; else if (t.startsWith('Fim de Semana')) data.cell.styles.textColor = [150, 150, 150]; }
+      if (t === 'Fim de Semana' || data.row.raw[5] === 'Fim de Semana') data.cell.styles.fillColor = [245, 245, 245];
     }
   });
 
   let y = pdf.lastAutoTable.finalY + 6;
   if (y > pageH - 40) { pdf.addPage(); y = 15; }   // só se o período for muito longo
-  pdf.setFontSize(10); pdf.setTextColor(0); pdf.setFont(undefined, 'bold');
-  pdf.text(`Saldo Total do Período: ${fmtMs(reportMeta.totalBalanceMs, true)}`, M, y);
-  pdf.setFont(undefined, 'normal'); y += 5;
-  pdf.setFontSize(8);
-  pdf.text(`Detalhamento: Ganho (Aprovado): ${fmtMs(reportMeta.ganho, true)} | Débitos: ${fmtMs(reportMeta.debito)} | Ajustes: ${fmtMs(reportMeta.ajuste, true)}`, M, y);
+  pdf.setFontSize(9); pdf.setTextColor(0); pdf.setFont(undefined, 'bold');
+  pdf.text(`Resumo do Período: Ganho (Aprovado): ${fmtMs(reportMeta.ganho, true)} | Débitos: ${fmtMs(reportMeta.debito)} | Ajustes: ${fmtMs(reportMeta.ajuste, true)}`, M, y);
+  pdf.setFont(undefined, 'normal');
   y += 6;
   if (lastReport && lastReport.pendencias > 0) {
     pdf.setTextColor(220, 38, 38);
