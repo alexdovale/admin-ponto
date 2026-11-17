@@ -1368,8 +1368,6 @@ $('download-pdf-btn').addEventListener('click', () => {
       if (data.column.index === 4) { if (t.startsWith('-')) data.cell.styles.textColor = [220, 38, 38]; else if (t.startsWith('+')) data.cell.styles.textColor = [22, 163, 74]; else if (t.includes('⏳')) data.cell.styles.textColor = [202, 138, 4]; }
       if (data.column.index === 5) { if (t === 'Falta') data.cell.styles.textColor = [220, 38, 38]; else if (t.startsWith('Fim de Semana')) data.cell.styles.textColor = [150, 150, 150]; }
       if (t === 'Fim de Semana' || data.row.raw[5] === 'Fim de Semana') data.cell.styles.fillColor = [245, 245, 245];
-      if (t === 'Falta') data.cell.styles.textColor = [220, 38, 38]; else if (t.startsWith('Fim de Semana')) data.cell.styles.textColor = [150, 150, 150]; }
-      if (t === 'Fim de Semana' || data.row.raw[5] === 'Fim de Semana') data.cell.styles.fillColor = [245, 245, 245];
     }
   });
 
