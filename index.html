@@ -105,9 +105,14 @@ label:has(input[name="access_type"]:checked) { border-color: #10B981; background
     <div>
       <div class="flex flex-wrap items-center justify-between mt-6 mb-2 gap-2">
         <h3 class="text-lg font-medium">Histórico de Registros</h3>
-        <div class="flex items-center gap-2">
-          <label for="period-select" class="text-sm font-medium text-gray-700">Período (ref.):</label>
-          <select id="period-select" class="p-1 border rounded-md bg-gray-50"></select>
+        <div class="flex flex-wrap items-center gap-3">
+          <div class="flex items-center gap-2">
+            <label for="period-select" class="text-sm font-medium text-gray-700">Período (ref.):</label>
+            <select id="period-select" class="p-1.5 border rounded-md bg-gray-50 text-sm"></select>
+          </div>
+          <button id="user-download-pdf-btn" class="hidden py-1.5 px-3 rounded-md text-xs font-semibold text-white bg-blue-600 hover:bg-blue-700 shadow-sm flex items-center gap-1.5 transition-all">
+            📄 Baixar Folha de Ponto (PDF)
+          </button>
         </div>
       </div>
       <div class="mt-4 overflow-x-auto border rounded-lg">
@@ -172,7 +177,7 @@ label:has(input[name="access_type"]:checked) { border-color: #10B981; background
             <div><label class="block text-xs font-medium text-gray-700 mb-1">Data Final:</label><input type="date" id="report-end-date" class="p-2 border rounded-md"></div>
             <button id="generate-report-btn" class="py-2 px-4 rounded-md text-white bg-green-600 hover:bg-green-700 h-10 shadow-sm">Gerar Relatório</button>
             <button id="report-adj-btn" class="py-2 px-4 rounded-md text-white bg-indigo-600 hover:bg-indigo-700 h-10 hidden shadow-sm">⚖️ Lançar Ajuste</button>
-            <button id="download-pdf-btn" class="py-2 px-4 rounded-md text-white bg-blue-600 hover:bg-blue-700 h-10 hidden shadow-sm">Baixar PDF</button>
+            <button id="download-pdf-btn" class="py-2 px-4 rounded-md text-white bg-blue-600 hover:bg-blue-700 h-10 hidden shadow-sm">📄 Baixar PDF</button>
             <button id="close-period-btn" class="py-2 px-4 rounded-md text-white bg-red-600 hover:bg-red-700 h-10 hidden">🔒 Fechar período</button>
             <button id="reopen-period-btn" class="py-2 px-4 rounded-md text-white bg-orange-500 hover:bg-orange-600 h-10 hidden">🔓 Reabrir período</button>
           </div>
@@ -1154,7 +1159,7 @@ async function loadAndRenderEditableHistory(userId, startDate, endDate) {
     }
 
     if (ev.state === 'extra_pending') {
-      saldo = fmtMs(ev.pendingExtra, true) + ' ⏳';
+      saldo = fmtMs(ev.pendingExtra, true) + ' (Pend.)';
       saldoClass = 'text-yellow-600 font-bold';
     } else if (['approved', 'pending', 'ok', 'absent', 'extra_approved', 'extra_declined'].includes(ev.state) || adjBalance !== 0) {
       saldo = ev.balance === 0 ? '00:00' : fmtMs(ev.balance, true);
@@ -1223,7 +1228,7 @@ async function loadAndRenderEditableHistory(userId, startDate, endDate) {
   $('download-pdf-btn').classList.remove('hidden'); $('report-adj-btn').classList.remove('hidden'); $('occurrence-section').classList.remove('hidden');
 
   reportCtx = { userId, entriesByDay, reqsByDate, reqs };
-  reportMeta = { userId, userName, startDate, endDate, totalBalanceMs: totalBalance, ganho: totalGanho, debito: totalDebito, ajuste: totalAjuste };
+  reportMeta = { userId, userName, team: userProfile.team || '', startDate, endDate, totalBalanceMs: totalBalance, ganho: totalGanho, debito: totalDebito, ajuste: totalAjuste, pendencias };
   lastReport = { userId, totalBalanceMs: totalBalance, pendencias, startISO: toISO(startDate), endISO: toISO(endDate) };
   updateCloseButtons();
   const [sy, sm] = $('report-start-date').value.split('-');
@@ -1332,99 +1337,267 @@ $('reopen-period-btn').addEventListener('click', async () => {
   try { await deleteDoc(doc(db, `artifacts/${appId}/closures`, `${uid}_${ref}`)); refreshReport(); } catch { alert('Erro ao reabrir.'); }
 });
 
-/* ---------- PDF (cabe em 1 página para períodos de até ~35 dias) ---------- */
+/* ---------- GERADOR DE PDF COMPARTILHADO (VISUAL APRIMORADO) ---------- */
 const toFileDate = d => `${d.getFullYear()}${pad(d.getMonth() + 1)}${pad(d.getDate())}`;
-$('download-pdf-btn').addEventListener('click', () => {
-  if (!reportMeta || !reportRows.length) return alert('Gere o relatório primeiro.');
+
+let cachedLogoDataUrl = undefined;
+async function getLogoBase64() {
+  if (cachedLogoDataUrl !== undefined) return cachedLogoDataUrl;
+  try {
+    const res = await fetch('https://raw.githubusercontent.com/alexdovale/calculo-mensuracao-codoc/main/logo.png');
+    const blob = await res.blob();
+    cachedLogoDataUrl = await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onloadend = () => resolve(reader.result);
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(blob);
+    });
+  } catch {
+    cachedLogoDataUrl = null;
+  }
+  return cachedLogoDataUrl;
+}
+
+async function generateFrequencyPDF({ meta, rows, occurrenceText, closureObj }) {
   if (!window.jspdf) return alert('Biblioteca de PDF não carregada. Verifique a conexão e recarregue a página.');
   const { jsPDF } = window.jspdf;
   const pdf = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageW = pdf.internal.pageSize.getWidth(), pageH = pdf.internal.pageSize.getHeight();
-  const M = 12, fmt = d => d.toLocaleDateString('pt-BR');
+  const M = 12, contentW = pageW - 2 * M;
+  const fmt = d => d.toLocaleDateString('pt-BR');
 
-  // Cabeçalho compacto
-  pdf.setFontSize(9); pdf.setTextColor(100);
-  pdf.text('Defensoria Pública do Estado do Rio de Janeiro - Coordenação de Gestão Documental', pageW / 2, 10, { align: 'center' });
-  pdf.setFontSize(13); pdf.setTextColor(0);
-  pdf.text('Relatório de Frequência', pageW / 2, 17, { align: 'center' });
-  pdf.setFontSize(10);
-  pdf.text(`Funcionário(a): ${reportMeta.userName}`, M, 24);
-  pdf.text(`Período: ${fmt(reportMeta.startDate)} a ${fmt(reportMeta.endDate)}`, M, 29);
-  let startY = 32;
-  const cl = closures[`${reportMeta.userId}_${refMonthOf(reportMeta.endDate)}`];
-  if (cl && cl.startDate === toISO(reportMeta.startDate) && cl.endDate === toISO(reportMeta.endDate)) {
-    pdf.setFontSize(8); pdf.setTextColor(30, 64, 175);
-    pdf.text(`Período fechado em ${cl.closedAt.toDate().toLocaleDateString('pt-BR')} por ${cl.closedBy} (ref. ${formatRef(cl.refMonth)})`, M, 33);
-    pdf.setTextColor(0); startY = 36;
+  // 1. Cabeçalho Institucional com Faixa Superior Verde
+  pdf.setFillColor(15, 118, 110); // Verde institucional DPRJ / CODOC
+  pdf.rect(0, 0, pageW, 20, 'F');
+
+  const logo = await getLogoBase64();
+  if (logo) {
+    try { pdf.addImage(logo, 'PNG', M, 3, 14, 14); } catch {}
   }
 
-  // Espaço reservado abaixo da tabela: saldo + ocorrência + assinaturas + rodapé
-  const occ = $('occurrence-details').value.trim();
-  const occLines = occ ? pdf.splitTextToSize(occ, pageW - 2 * M) : [];
-  const reserve = 8 + (cl && cl.bank ? 5 : 0) + (occLines.length ? 6 + occLines.length * 3.6 + 3 : 0) + 22 + 10;
-  const avail = pageH - startY - reserve;
-  const rowH = avail / (reportRows.length + 1);                 // altura disponível por linha (mm)
-  const fontSize = Math.max(5.5, Math.min(8, (rowH - 1.2) / 0.4057));
-  const padV = Math.max(0.4, Math.min(2, (rowH - fontSize * 0.4057) / 2));
+  pdf.setTextColor(255, 255, 255);
+  pdf.setFont(undefined, 'bold');
+  pdf.setFontSize(10.5);
+  pdf.text('DEFENSORIA PÚBLICA DO ESTADO DO RIO DE JANEIRO', pageW / 2, 7.5, { align: 'center' });
+  pdf.setFont(undefined, 'normal');
+  pdf.setFontSize(8.5);
+  pdf.text('Sede Administrativa - Coordenação de Gestão Documental (CODOC)', pageW / 2, 12.5, { align: 'center' });
+  pdf.setFont(undefined, 'bold');
+  pdf.setFontSize(10);
+  pdf.text('FOLHA DE FREQUÊNCIA INDIVIDUAL', pageW / 2, 17.5, { align: 'center' });
 
+  // 2. Cartão de Identificação do Colaborador e Período
+  let curY = 23;
+  const infoH = closureObj ? 18 : 14;
+  pdf.setFillColor(248, 250, 252);
+  pdf.setDrawColor(203, 213, 225);
+  pdf.roundedRect(M, curY, contentW, infoH, 1.5, 1.5, 'FD');
+
+  pdf.setTextColor(30, 41, 59);
+  pdf.setFontSize(8.5);
+  pdf.setFont(undefined, 'bold');
+  pdf.text('Colaborador(a):', M + 3, curY + 5);
+  pdf.setFont(undefined, 'normal');
+  pdf.text(String(meta.userName || '---'), M + 28, curY + 5);
+
+  const teamLabel = meta.team ? String(meta.team).toUpperCase() : 'CODOC';
+  pdf.setFont(undefined, 'bold');
+  pdf.text('Equipe / Setor:', pageW - M - 52, curY + 5);
+  pdf.setFont(undefined, 'normal');
+  pdf.text(teamLabel, pageW - M - 27, curY + 5);
+
+  const refYm = closureObj?.refMonth || refMonthOf(meta.endDate);
+  pdf.setFont(undefined, 'bold');
+  pdf.text('Período Apurado:', M + 3, curY + 10.5);
+  pdf.setFont(undefined, 'normal');
+  pdf.text(`${fmt(meta.startDate)} a ${fmt(meta.endDate)}  (Ref.: ${formatRef(refYm)})`, M + 31, curY + 10.5);
+
+  pdf.setFont(undefined, 'bold');
+  pdf.text('Jornada Diária:', pageW - M - 52, curY + 10.5);
+  pdf.setFont(undefined, 'normal');
+  pdf.text('06:00 horas', pageW - M - 27, curY + 10.5);
+
+  if (closureObj) {
+    pdf.setFontSize(7.5);
+    pdf.setTextColor(21, 128, 61);
+    pdf.setFont(undefined, 'bold');
+    const cDate = closureObj.closedAt?.toDate ? closureObj.closedAt.toDate().toLocaleDateString('pt-BR') : '';
+    pdf.text(`PONTO FECHADO E HOMOLOGADO EM ${cDate} POR ${(closureObj.closedBy || 'COORDENAÇÃO').toUpperCase()}`, M + 3, curY + 15.5);
+  } else {
+    pdf.setFontSize(7);
+    pdf.setTextColor(180, 83, 9);
+    pdf.text('[ Período em aberto ]', pageW - M - 3, curY + 13, { align: 'right' });
+  }
+
+  let startY = curY + infoH + 2.5;
+
+  // 3. Dimensionamento inteligente para caber em 1 página A4
+  const occ = (occurrenceText || '').trim();
+  const occLines = occ ? pdf.splitTextToSize(occ, contentW - 6) : [];
+  const hasBankSnap = !!(closureObj && closureObj.bank);
+  const hasPend = (meta.pendencias || 0) > 0;
+
+  const cardsReserve = 13 + (hasBankSnap ? 5 : 0) + (hasPend ? 4.5 : 0);
+  const occReserve = occLines.length ? (7 + occLines.length * 3.4) : 0;
+  const sigReserve = 24;
+  const reserve = cardsReserve + occReserve + sigReserve;
+
+  const avail = pageH - startY - reserve;
+  const rowH = avail / (rows.length + 1);
+  const fontSize = Math.max(5.5, Math.min(7.8, (rowH - 1.1) / 0.4057));
+  const padV = Math.max(0.4, Math.min(1.8, (rowH - fontSize * 0.4057) / 2));
+
+  const cleanRows = rows.map(r => r.map(c => String(c ?? '').replace(/⏳/g, '(Pend.)').replace(/🔒/g, '').trim()));
+
+  // 4. Tabela de Frequência com Grade Estruturada
   pdf.autoTable({
     startY, margin: { left: M, right: M, bottom: 8 },
-    head: [['Data', 'Dia', 'Entradas', 'Saídas', 'Saldo', 'Observação']], body: reportRows,
-    styles: { fontSize, cellPadding: { top: padV, bottom: padV, left: 1.5, right: 1.5 }, overflow: 'ellipsize', valign: 'middle' },
-    headStyles: { fillColor: [22, 163, 74], textColor: 255, fontSize },
-    columnStyles: { 0: { cellWidth: 20 }, 1: { cellWidth: 12 }, 2: { cellWidth: 26 }, 3: { cellWidth: 26 }, 4: { cellWidth: 18, halign: 'center' }, 5: { cellWidth: 'auto' } },
+    head: [['Data', 'Dia', 'Entrada', 'Saída', 'Saldo Dia', 'Observação / Justificativa']],
+    body: cleanRows,
+    theme: 'grid',
+    styles: {
+      fontSize,
+      cellPadding: { top: padV, bottom: padV, left: 2, right: 2 },
+      overflow: 'ellipsize',
+      valign: 'middle',
+      lineColor: [226, 232, 240],
+      lineWidth: 0.15,
+      textColor: [30, 41, 59]
+    },
+    headStyles: {
+      fillColor: [15, 118, 110],
+      textColor: 255,
+      fontSize,
+      fontStyle: 'bold',
+      halign: 'center',
+      lineColor: [15, 118, 110]
+    },
+    alternateRowStyles: { fillColor: [250, 252, 254] },
+    columnStyles: {
+      0: { cellWidth: 21, halign: 'center', fontStyle: 'bold' },
+      1: { cellWidth: 13, halign: 'center' },
+      2: { cellWidth: 22, halign: 'center' },
+      3: { cellWidth: 22, halign: 'center' },
+      4: { cellWidth: 20, halign: 'center', fontStyle: 'bold' },
+      5: { cellWidth: 'auto', halign: 'left' }
+    },
     didParseCell: (data) => {
       if (data.section !== 'body') return;
       const t = String(data.cell.raw || '');
-      if (data.column.index === 4) { if (t.startsWith('-')) data.cell.styles.textColor = [220, 38, 38]; else if (t.startsWith('+')) data.cell.styles.textColor = [22, 163, 74]; else if (t.includes('⏳')) data.cell.styles.textColor = [202, 138, 4]; }
-      if (data.column.index === 5) { if (t === 'Falta') data.cell.styles.textColor = [220, 38, 38]; else if (t.startsWith('Fim de Semana')) data.cell.styles.textColor = [150, 150, 150]; }
-      if (t === 'Fim de Semana' || data.row.raw[5] === 'Fim de Semana') data.cell.styles.fillColor = [245, 245, 245];
+      const obsCol = String(data.row.raw[5] || '');
+      if (obsCol === 'Fim de Semana' || obsCol === 'Antes da Admissão') {
+        data.cell.styles.fillColor = [241, 245, 249];
+        data.cell.styles.textColor = [148, 163, 184];
+      }
+      if (data.column.index === 4) {
+        if (t.startsWith('-')) data.cell.styles.textColor = [220, 38, 38];
+        else if (t.startsWith('+') && !t.includes('Pend')) data.cell.styles.textColor = [22, 163, 74];
+        else if (t.includes('Pend')) data.cell.styles.textColor = [180, 83, 9];
+      }
+      if (data.column.index === 5) {
+        if (t === 'Falta') { data.cell.styles.textColor = [220, 38, 38]; data.cell.styles.fontStyle = 'bold'; }
+        else if (t.startsWith('Ajuste:')) data.cell.styles.textColor = [79, 70, 229];
+        else if (t.startsWith('Abonada') || t.startsWith('Extra Aprovada')) data.cell.styles.textColor = [21, 128, 61];
+      }
     }
   });
 
-  let y = pdf.lastAutoTable.finalY + 6;
-  if (y > pageH - 40) { pdf.addPage(); y = 15; }   // só se o período for muito longo
-  pdf.setFontSize(9); pdf.setTextColor(0); pdf.setFont(undefined, 'bold');
-  pdf.text(`Resumo do Período: Ganho (Aprovado): ${fmtMs(reportMeta.ganho, true)} | Débitos: ${fmtMs(reportMeta.debito)} | Ajustes: ${fmtMs(reportMeta.ajuste, true)}`, M, y);
-  pdf.setFont(undefined, 'normal');
-  y += 6;
-  if (lastReport && lastReport.pendencias > 0) {
-    pdf.setTextColor(220, 38, 38);
-    pdf.text(`Atenção: Existem ${lastReport.pendencias} pendência(s) (extras não analisadas, faltas ou marcações ímpares).`, M, y);
-    pdf.setTextColor(0);
-    y += 5;
-  }
-  
-  if (cl && cl.bank && cl.startDate === toISO(reportMeta.startDate)) {
-    pdf.setFontSize(8);
-    pdf.text(`Banco de horas no fechamento: saldo ${fmtMs(cl.bank.balanceMs, true)} | ganho ${fmtMs(cl.bank.earnedMs, true)} | consumido ${fmtMs(-cl.bank.consumedMs)} | débitos ${fmtMs(-cl.bank.debtMs)}`, M, y);
-    y += 5;
+  let y = pdf.lastAutoTable.finalY + 3.5;
+  if (y > pageH - 38) { pdf.addPage(); y = 15; }
+
+  // 5. Três Cartões de Resumo do Período (Ganho | Débitos | Ajustes)
+  const boxGap = 3, boxW = (contentW - 2 * boxGap) / 3, boxH = 10;
+  const summaryBoxes = [
+    { label: 'GANHO NO PERÍODO (APROVADO)', val: fmtMs(meta.ganho || 0, true), bg: [240, 253, 244], border: [187, 247, 208], txt: [21, 128, 61] },
+    { label: 'DÉBITOS / FALTAS NO PERÍODO', val: fmtMs(meta.debito || 0), bg: [254, 242, 242], border: [254, 202, 202], txt: [185, 28, 28] },
+    { label: 'AJUSTES ADMINISTRATIVOS', val: fmtMs(meta.ajuste || 0, true), bg: [238, 242, 255], border: [199, 210, 254], txt: [67, 56, 202] }
+  ];
+  summaryBoxes.forEach((b, idx) => {
+    const bx = M + idx * (boxW + boxGap);
+    pdf.setFillColor(...b.bg);
+    pdf.setDrawColor(...b.border);
+    pdf.roundedRect(bx, y, boxW, boxH, 1.2, 1.2, 'FD');
+    pdf.setFontSize(6.2);
+    pdf.setTextColor(100, 116, 139);
+    pdf.setFont(undefined, 'bold');
+    pdf.text(b.label, bx + boxW / 2, y + 3.5, { align: 'center' });
+    pdf.setFontSize(9);
+    pdf.setTextColor(...b.txt);
+    pdf.text(b.val, bx + boxW / 2, y + 8.2, { align: 'center' });
+  });
+  y += boxH + 3.5;
+
+  if (hasPend) {
+    pdf.setFontSize(7.5); pdf.setTextColor(180, 83, 9); pdf.setFont(undefined, 'bold');
+    pdf.text(`Atenção: Existem ${meta.pendencias} pendência(s) neste período (extras não analisadas, faltas ou marcações ímpares).`, M, y);
+    pdf.setFont(undefined, 'normal');
+    y += 4.5;
   }
 
+  if (hasBankSnap) {
+    pdf.setFontSize(7.5); pdf.setTextColor(51, 65, 85); pdf.setFont(undefined, 'bold');
+    pdf.text(`Posição do Banco de Horas no fechamento: Saldo Geral ${fmtMs(closureObj.bank.balanceMs, true)}  |  Ganho Acum. ${fmtMs(closureObj.bank.earnedMs, true)}  |  Consumido ${fmtMs(-closureObj.bank.consumedMs)}  |  Débitos ${fmtMs(-closureObj.bank.debtMs)}`, M, y);
+    pdf.setFont(undefined, 'normal');
+    y += 4.5;
+  }
+
+  // 6. Quadro de Registro de Ocorrência (se houver)
   if (occLines.length) {
-    pdf.setFont(undefined, 'bold'); pdf.setFontSize(9); pdf.text('Registro de Ocorrência:', M, y); pdf.setFont(undefined, 'normal');
-    pdf.setFontSize(8); y += 4.5;
-    occLines.forEach(line => { if (y > pageH - 30) { pdf.addPage(); y = 15; } pdf.text(line, M, y); y += 3.6; });
-    y += 3;
+    const occH = 5.5 + occLines.length * 3.4;
+    if (y + occH > pageH - 22) { pdf.addPage(); y = 15; }
+    pdf.setFillColor(254, 252, 232);
+    pdf.setDrawColor(253, 224, 71);
+    pdf.roundedRect(M, y, contentW, occH, 1.2, 1.2, 'FD');
+    pdf.setFont(undefined, 'bold'); pdf.setFontSize(7.5); pdf.setTextColor(133, 77, 14);
+    pdf.text('Registro de Ocorrência:', M + 2.5, y + 3.8);
+    pdf.setFont(undefined, 'normal'); pdf.setFontSize(7.5); pdf.setTextColor(51, 65, 85);
+    let oy = y + 7.2;
+    occLines.forEach(line => { pdf.text(line, M + 2.5, oy); oy += 3.4; });
+    y += occH + 3;
   }
 
-  // Assinaturas fixas no fim da página
-  const sigY = Math.max(y + 12, pageH - 22);
-  if (sigY > pageH - 12) { pdf.addPage(); y = 30; }
-  const sy = sigY > pageH - 12 ? 30 : sigY;
-  pdf.setDrawColor(0);
-  pdf.line(20, sy, 90, sy); pdf.line(pageW - 90, sy, pageW - 20, sy);
-  pdf.setFontSize(8);
-  pdf.text('Estagiário(a) / Residente', 55, sy + 4, { align: 'center' });
-  pdf.text('Chefia imediata', pageW - 55, sy + 4, { align: 'center' });
+  // 7. Assinaturas fixas no fim da página
+  const sigY = Math.max(y + 10, pageH - 18);
+  const sy = sigY > pageH - 12 ? (pdf.addPage(), 35) : sigY;
+  pdf.setDrawColor(100, 116, 139);
+  pdf.setLineWidth(0.3);
+  pdf.line(22, sy, 92, sy);
+  pdf.line(pageW - 92, sy, pageW - 22, sy);
+  pdf.setFontSize(8); pdf.setTextColor(30, 41, 59); pdf.setFont(undefined, 'bold');
+  pdf.text(String(meta.userName || 'Estagiário(a) / Residente'), 57, sy + 4, { align: 'center' });
+  pdf.text('Coordenação / Chefia Imediata', pageW - 57, sy + 4, { align: 'center' });
+  pdf.setFontSize(6.8); pdf.setTextColor(100, 116, 139); pdf.setFont(undefined, 'normal');
+  pdf.text('Assinatura do(a) Estagiário(a) / Residente', 57, sy + 7.5, { align: 'center' });
+  pdf.text('Assinatura e Carimbo', pageW - 57, sy + 7.5, { align: 'center' });
 
-  const total = pdf.internal.getNumberOfPages();
-  for (let i = 1; i <= total; i++) {
-    pdf.setPage(i); pdf.setFontSize(7); pdf.setTextColor(120);
-    pdf.text(`Emitido em ${new Date().toLocaleString('pt-BR')} - Página ${i}/${total}`, pageW / 2, pageH - 5, { align: 'center' });
+  // 8. Rodapé institucional
+  const totalPages = pdf.internal.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    pdf.setPage(i);
+    pdf.setFontSize(6.5); pdf.setTextColor(148, 163, 184);
+    pdf.text(`Documento emitido pelo Sistema Integrado de Ponto CODOC/DPRJ em ${new Date().toLocaleString('pt-BR')}  •  Página ${i} de ${totalPages}`, pageW / 2, pageH - 4.5, { align: 'center' });
   }
-  const safe = reportMeta.userName.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_');
-  pdf.save(`ponto_${safe}_${toFileDate(reportMeta.startDate)}_${toFileDate(reportMeta.endDate)}.pdf`);
+
+  const safe = String(meta.userName || 'funcionario').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, '_');
+  pdf.save(`Frequencia_${safe}_${toFileDate(meta.startDate)}_${toFileDate(meta.endDate)}.pdf`);
+}
+
+$('download-pdf-btn').addEventListener('click', async () => {
+  if (!reportMeta || !reportRows.length) return alert('Gere o relatório primeiro.');
+  const btn = $('download-pdf-btn'), old = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Gerando PDF...';
+  try {
+    const cl = closures[`${reportMeta.userId}_${refMonthOf(reportMeta.endDate)}`];
+    const validClosure = (cl && cl.startDate === toISO(reportMeta.startDate) && cl.endDate === toISO(reportMeta.endDate)) ? cl : null;
+    await generateFrequencyPDF({
+      meta: reportMeta,
+      rows: reportRows,
+      occurrenceText: $('occurrence-details').value.trim(),
+      closureObj: validClosure
+    });
+  } finally {
+    btn.disabled = false; btn.textContent = old;
+  }
 });
 
 /* ============================ ADMIN: LANÇAMENTO RÁPIDO ============================ */
@@ -2106,7 +2279,11 @@ function renderUserApp() {
   const banner = $('period-closed-banner');
   if (mine.length) {
     const c = mine[0];
-    banner.innerHTML = `🔒 <strong>Ponto fechado</strong> – período ref. ${formatRef(c.refMonth)} (${isoToBR(c.startDate)} a ${isoToBR(c.endDate)})`;
+    banner.innerHTML = `<div class="flex flex-wrap items-center justify-center gap-3">
+      <span>🔒 <strong>Ponto fechado</strong> – período ref. ${formatRef(c.refMonth)} (${isoToBR(c.startDate)} a ${isoToBR(c.endDate)})</span>
+      <button type="button" data-ref="${c.refMonth}" class="banner-pdf-btn py-1 px-3 rounded bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold shadow-sm">📄 Baixar Folha de Ponto (PDF)</button>
+    </div>`;
+    banner.querySelector('.banner-pdf-btn')?.addEventListener('click', (ev) => downloadUserPeriodPDF(ev.currentTarget.dataset.ref));
     banner.classList.remove('hidden');
   } else banner.classList.add('hidden');
 
@@ -2134,6 +2311,9 @@ function renderHistoryUser() {
   const body = $('history-table-body'); body.innerHTML = '';
   const ref = $('period-select').value; if (!ref) return;
   const uid = auth.currentUser.uid, { start, end } = getPeriodByRef(ref), todayS = startOfToday();
+  const isPeriodClosed = !!closures[`${uid}_${ref}`];
+  $('user-download-pdf-btn').classList.toggle('hidden', !isPeriodClosed);
+
   const byDate = groupBy(allUserEntries, e => e.timestamp.toDate().toLocaleDateString('pt-BR'));
   const reqsBy = groupBy(allUserRequestsData, r => r.date);
   const days = [];
@@ -2205,6 +2385,109 @@ function renderHistoryUser() {
   $('no-history-message').classList.toggle('hidden', shown > 0);
   const el = $('accumulated-balance'); el.textContent = fmtMs(periodBalance, true); el.className = `text-3xl font-bold ${balClass(periodBalance)}`;
 }
+
+/* ---------- Download de PDF do Período Fechado pelo Estagiário ---------- */
+async function downloadUserPeriodPDF(refYm) {
+  const user = auth.currentUser; if (!user || !refYm) return;
+  const cl = closures[`${user.uid}_${refYm}`];
+  if (!cl) return alert('Este período ainda não foi fechado pela coordenação.');
+
+  const { start, end } = getPeriodByRef(refYm);
+  const byDate = groupBy(allUserEntries, e => e.timestamp.toDate().toLocaleDateString('pt-BR'));
+  const reqsByDate = groupBy(allUserRequestsData, r => r.date);
+  const adjsByDate = groupBy(userAdjs, a => a.dateStr || '');
+  const admissionDate = currentUserProfile.admissionDate || null;
+  const todayS = startOfToday();
+
+  let totalBalance = 0, totalGanho = 0, totalDebito = 0, totalAjuste = 0, pendencias = 0;
+  const rows = [];
+
+  for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+    const date = new Date(d); date.setHours(0, 0, 0, 0);
+    const ds = date.toLocaleDateString('pt-BR');
+    const dow = date.toLocaleDateString('pt-BR', { weekday: 'short' }).replace('.', '');
+    const dayReqs = reqsByDate[ds] || [];
+    const dayAdjs = adjsByDate[ds] || [];
+
+    let adjBalance = 0, adjTexts = [];
+    dayAdjs.forEach(a => {
+      adjBalance += (a.diffMs || 0);
+      adjTexts.push(`${a.diffMs > 0 ? '+' : '-'}${minToTime(Math.abs(a.diffMs) / 60000)} (${a.reason})`);
+    });
+
+    const ev = evalDay(date, byDate[ds] || [], dayReqs, todayS, admissionDate);
+    if (ev.balance > 0) totalGanho += ev.balance;
+    if (ev.balance < 0) totalDebito += ev.balance;
+    totalAjuste += adjBalance;
+    ev.balance += adjBalance;
+
+    const insT = ev.ins.map(e => hhmm(e.timestamp)), outsT = ev.outs.map(e => hhmm(e.timestamp));
+    let obs = '---', saldo = '---';
+
+    switch (ev.state) {
+      case 'pre_admission': obs = 'Antes da Admissão'; break;
+      case 'weekend': obs = 'Fim de Semana'; break;
+      case 'future': if (ev.label) obs = `${ev.label} (agendada)`; break;
+      case 'approved': obs = `${ev.label} (${ev.req.text})`; break;
+      case 'pending': obs = `Pendente (${ev.req.text})`; break;
+      case 'absent': obs = 'Falta'; break;
+      case 'odd': obs = 'Batida Ímpar'; break;
+      case 'inprogress': obs = 'Em andamento'; break;
+      case 'extra_pending': obs = 'Hora Extra Pendente'; break;
+      case 'extra_approved': obs = 'Extra Aprovada'; break;
+      case 'extra_declined': obs = 'Extra Recusada'; break;
+      case 'today': obs = 'Hoje'; break;
+    }
+
+    if (adjBalance !== 0) {
+      const aTxt = `Ajuste: ${adjTexts.join(', ')}`;
+      if (obs === '---' || obs === 'Hoje') obs = aTxt;
+      else obs += ` | ${aTxt}`;
+    }
+
+    if (ev.state === 'extra_pending') {
+      saldo = fmtMs(ev.pendingExtra, true) + ' (Pend.)';
+    } else if (['approved', 'pending', 'ok', 'absent', 'extra_approved', 'extra_declined'].includes(ev.state) || adjBalance !== 0) {
+      saldo = ev.balance === 0 ? '00:00' : fmtMs(ev.balance, true);
+    }
+
+    totalBalance += ev.balance;
+    if ((ev.state === 'absent' || ev.state === 'odd' || ev.state === 'extra_pending') && !ev.approved) pendencias++;
+    if (dayReqs.some(r => r.status === 'pending' && r.kind !== 'extra_hours')) pendencias++;
+
+    rows.push([ds, dow, insT.join(' / ') || '---', outsT.join(' / ') || '---', saldo, obs]);
+  }
+
+  let occurrenceText = '';
+  try {
+    const sy = start.getFullYear(), sm = pad(start.getMonth() + 1);
+    const snap = await getDoc(doc(db, 'artifacts', appId, 'users', user.uid, 'reports', `${sy}-${sm}`));
+    if (snap.exists()) occurrenceText = snap.data().occurrenceText || '';
+  } catch {}
+
+  await generateFrequencyPDF({
+    meta: {
+      userId: user.uid,
+      userName: currentUserProfile.name || $('user-user-name').textContent,
+      team: currentUserProfile.team || '',
+      startDate: start,
+      endDate: end,
+      totalBalanceMs: totalBalance,
+      ganho: totalGanho,
+      debito: totalDebito,
+      ajuste: totalAjuste,
+      pendencias
+    },
+    rows,
+    occurrenceText,
+    closureObj: cl
+  });
+}
+
+$('user-download-pdf-btn').addEventListener('click', () => {
+  const ref = $('period-select').value;
+  if (ref) downloadUserPeriodPDF(ref);
+});
 
 $('view-grand-total-details-btn').addEventListener('click', () => {
   const body = $('grand-total-details-body'); body.innerHTML = '';
